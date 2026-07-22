@@ -278,19 +278,23 @@ const firebaseConfig = {
 // =========================================================================
 
 // ====== CONFIGURAÇÃO EMAILJS — troque pelos dados da sua conta ======
-const EMAILJS_PUBLIC_KEY = "SUA_PUBLIC_KEY";
-const EMAILJS_SERVICE_ID = "SEU_SERVICE_ID";
-const EMAILJS_TEMPLATE_ID = "SEU_TEMPLATE_ID";
-const EMAIL_BARBEIRO = "email-do-barbeiro@exemplo.com";
+const EMAILJS_PUBLIC_KEY = "HTO7hOr-_3BU0mUcG";
+const EMAILJS_SERVICE_ID = "service_dueu4eu";
+const EMAILJS_TEMPLATE_ID = "template_og6y8o8";
+const EMAIL_BARBEIRO = "rodrigocardoso03@outlook.com";
 // =========================================================================
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const HORA_ABERTURA = 8 * 60;   // 08:00 em minutos
-const HORA_FECHAMENTO = 20 * 60; // 20:00 em minutos
 const INTERVALO_SLOT = 15; // granularidade dos horários exibidos, em minutos
 const MARGEM_POS_ESCALA = 90; // 1h30 de bloqueio após a escala
+
+// Ciclo de 28 dias do revezamento 4 turmas / 3 turnos, calibrado com a tabela oficial,
+// com a letra A ancorada em 2026-01-01 (dia 0 do ciclo). null = folga.
+const CICLO_ABCD28 = [["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],null,["16:45","24:00"],["16:45","24:00"],["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],null,null,["16:45","24:00"],["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],["08:15","16:45"],null,["16:45","24:00"]];
+const ANCORA_CICLO_ABCD28 = "2026-01-01";
+const OFFSET_LETRA_ABCD28 = {A:0, B:7, C:14, D:21};
 
 let servicos = [];
 let servicoSelecionado = null;
@@ -308,6 +312,11 @@ function toHHMM(min){
 }
 function formatarMoeda(v){
   return v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+}
+function diasEntre(dataInicioStr, dataFimStr){
+  const a = new Date(dataInicioStr+"T00:00:00");
+  const b = new Date(dataFimStr+"T00:00:00");
+  return Math.round((b - a) / 86400000);
 }
 
 // ---------- Carregar serviços ----------
@@ -344,19 +353,55 @@ async function carregarServicos(){
   });
 }
 
+// ---------- Calcular a escala do dia (sem precisar importar nada) ----------
+let escalaPatternCache = null;
+
+async function carregarEscalaPattern(){
+  if(escalaPatternCache) return escalaPatternCache;
+  const snap = await getDoc(doc(db, "config", "escalaPattern"));
+  escalaPatternCache = snap.exists() ? snap.data() : {tipo:"nenhuma"};
+  return escalaPatternCache;
+}
+
+async function calcularEscalaDoDia(dataStr){
+  // Exceção pontual tem prioridade sobre a escala normal
+  const excSnap = await getDoc(doc(db, "escalaExcecoes", dataStr));
+  if(excSnap.exists()) return excSnap.data();
+
+  const pattern = await carregarEscalaPattern();
+
+  if(pattern.tipo === "abcd28"){
+    const offset = OFFSET_LETRA_ABCD28[pattern.letra] || 0;
+    const diff = diasEntre(ANCORA_CICLO_ABCD28, dataStr);
+    const idx = (((diff + offset) % 28) + 28) % 28;
+    const turno = CICLO_ABCD28[idx];
+    if(!turno) return {trabalha:false};
+    return {trabalha:true, horaInicio:turno[0], horaFim:turno[1]};
+  }
+
+  if(pattern.tipo === "ciclo"){
+    const total = pattern.diasTrabalho + pattern.diasFolga;
+    const diff = diasEntre(pattern.dataReferencia, dataStr);
+    const pos = ((diff % total) + total) % total;
+    if(pos < pattern.diasTrabalho){
+      return {trabalha:true, horaInicio:pattern.horaInicio, horaFim:pattern.horaFim};
+    }
+    return {trabalha:false};
+  }
+
+  return {trabalha:false}; // tipo "nenhuma"
+}
+
 // ---------- Buscar bloqueios do dia (escala + manual + agendamentos) ----------
 async function buscarBloqueios(dataStr){
   const bloqueios = [];
 
-  // 1) Escala do dia: escalaCalendario/{data} -> {trabalha:true, horaInicio, horaFim} ou {trabalha:false}
-  const escalaDoc = await getDoc(doc(db, "escalaCalendario", dataStr));
-  if(escalaDoc.exists()){
-    const dia = escalaDoc.data();
-    if(dia.trabalha){
-      const inicio = toMinutos(dia.horaInicio);
-      const fim = toMinutos(dia.horaFim) + MARGEM_POS_ESCALA;
-      bloqueios.push({inicio, fim, tipo:"escala"});
-    }
+  // 1) Escala do dia, calculada dinamicamente
+  const diaEscala = await calcularEscalaDoDia(dataStr);
+  if(diaEscala.trabalha){
+    const inicio = toMinutos(diaEscala.horaInicio);
+    const fim = toMinutos(diaEscala.horaFim) + MARGEM_POS_ESCALA;
+    bloqueios.push({inicio, fim, tipo:"escala"});
   }
 
   // 2) Bloqueios manuais do dia
@@ -380,17 +425,22 @@ function sobrepoe(aInicio, aFim, bInicio, bFim){
   return aInicio < bFim && bInicio < aFim;
 }
 
-let diasSemanaAbertos = null; // cache
+let diasSemanaConfig = null; // cache
 
-async function carregarDiasSemanaAbertos(){
-  if(diasSemanaAbertos) return diasSemanaAbertos;
+async function carregarDiasSemanaConfig(){
+  if(diasSemanaConfig) return diasSemanaConfig;
   const snap = await getDoc(doc(db,"config","diasSemana"));
   const dados = snap.exists() ? snap.data() : {};
-  diasSemanaAbertos = {};
+  diasSemanaConfig = {};
   DIAS_SEMANA_CHAVES.forEach(chave => {
-    diasSemanaAbertos[chave] = dados[chave] !== false; // padrão: aberto
+    const cfg = dados[chave] || {};
+    diasSemanaConfig[chave] = {
+      aberto: cfg.aberto !== false, // padrão: aberto
+      inicio: cfg.inicio || "08:00",
+      fim: cfg.fim || "20:00",
+    };
   });
-  return diasSemanaAbertos;
+  return diasSemanaConfig;
 }
 
 async function atualizarSlotsSeProntos(){
@@ -398,13 +448,18 @@ async function atualizarSlotsSeProntos(){
   const el = document.getElementById("listaSlots");
   el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Carregando horários...</p>`;
 
-  const abertos = await carregarDiasSemanaAbertos();
+  const dias = await carregarDiasSemanaConfig();
   const diaSemana = new Date(dataSelecionada+"T00:00:00").getDay(); // 0=dom ... 6=sáb
   const chaveDia = DIAS_SEMANA_CHAVES[diaSemana];
-  if(!abertos[chaveDia]){
+  const configDia = dias[chaveDia];
+
+  if(!configDia.aberto){
     el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Não atendemos nesse dia da semana. Escolha outra data.</p>`;
     return;
   }
+
+  const horaAbertura = toMinutos(configDia.inicio);
+  const horaFechamento = toMinutos(configDia.fim);
 
   const bloqueios = await buscarBloqueios(dataSelecionada);
   const duracao = servicoSelecionado.duracaoMin;
@@ -412,7 +467,7 @@ async function atualizarSlotsSeProntos(){
   el.innerHTML = "";
   let algumLivre = false;
 
-  for(let t = HORA_ABERTURA; t + duracao <= HORA_FECHAMENTO; t += INTERVALO_SLOT){
+  for(let t = horaAbertura; t + duracao <= horaFechamento; t += INTERVALO_SLOT){
     const fimSlot = t + duracao;
     const conflita = bloqueios.some(b => sobrepoe(t, fimSlot, b.inicio, b.fim));
 

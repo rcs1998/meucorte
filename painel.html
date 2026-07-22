@@ -214,39 +214,70 @@
     <!-- ESCALA -->
     <section class="aba" id="aba-escala">
       <div class="card">
-        <h3>Dias da semana abertos para agendamento particular</h3>
-        <p style="color:var(--text-dim); font-size:13px;">Desmarque os dias em que você não quer receber agendamento de cliente. Nesses dias a agenda fica fechada — só você consegue marcar algo manualmente, se precisar.</p>
-        <div id="listaDiasSemana" style="display:flex; flex-wrap:wrap; gap:14px; margin:12px 0;"></div>
-        <button class="acao" onclick="salvarDiasSemana()">Salvar dias</button>
+        <h3>Dias e horário de funcionamento</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Desmarque os dias em que não quer atender, e ajuste o horário de cada dia (ex: sábado até mais cedo).</p>
+        <div id="listaDiasSemana"></div>
+        <button class="acao" onclick="salvarDiasSemana()">Salvar horários</button>
       </div>
+
       <div class="card">
-        <h3>Importar escala 2026 (letra A)</h3>
-        <p style="color:var(--text-dim); font-size:13px;">
-          Já está com os 365 dias de 2026 calculados a partir da tabela oficial (turno 3x4 letras).
-          Um clique grava tudo em <code>escalaCalendario</code>: dias de trabalho da letra A (com o turno do dia) e dias de folga.
-          O bloqueio na agenda particular já soma 1h30 automaticamente depois do turno.
-        </p>
-        <button class="acao" onclick="importarEscala2026()">Importar escala 2026</button>
-        <span id="statusImportacao" style="margin-left:10px; font-size:13px; color:var(--text-dim);"></span>
+        <h3>Escala de trabalho (bloqueio automático)</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Escolha o tipo de escala. O sistema calcula sozinho, para qualquer data futura, quando você está de folga ou trabalhando — sem precisar importar nada.</p>
+
+        <label>Tipo de escala</label>
+        <select id="tipoEscala">
+          <option value="nenhuma">Nenhuma (só bloqueios manuais)</option>
+          <option value="abcd28">Revezamento 4 turmas / 3 turnos (ciclo de 28 dias)</option>
+          <option value="ciclo">Ciclo personalizado (12x36, 2x2, 3x3...)</option>
+        </select>
+
+        <div id="camposAbcd28" class="oculto" style="margin-top:12px;">
+          <label>Sua letra na escala</label>
+          <select id="escalaLetra">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+          <p style="color:var(--text-dim); font-size:12px; margin-top:6px;">O ciclo já está calibrado com base na tabela oficial de turnos — só escolher a letra.</p>
+        </div>
+
+        <div id="camposCiclo" class="oculto" style="margin-top:12px;">
+          <div class="linha">
+            <div><label>Dias trabalhando</label><input type="number" id="cicloDiasTrabalho" min="1" placeholder="Ex: 1 (12x36), 2, 3..."></div>
+            <div><label>Dias de folga</label><input type="number" id="cicloDiasFolga" min="1" placeholder="Ex: 1 (12x36), 2, 3..."></div>
+          </div>
+          <div class="linha">
+            <div><label>Início do turno</label><input type="time" id="cicloHoraInicio"></div>
+            <div><label>Fim do turno</label><input type="time" id="cicloHoraFim"></div>
+          </div>
+          <label>Um dia que você trabalhou (referência)</label>
+          <input type="date" id="cicloDataReferencia">
+        </div>
+
+        <br>
+        <button class="acao" onclick="salvarEscalaPattern()">Salvar escala</button>
+        <span id="statusEscalaPattern" style="margin-left:10px; font-size:13px; color:var(--text-dim);"></span>
       </div>
+
       <div class="card">
-        <h3>Ajustar um dia manualmente</h3>
-        <p style="color:var(--text-dim); font-size:13px;">Use isso só para corrigir uma exceção pontual (troca de turno, folga combinada, etc).</p>
+        <h3>Exceção pontual</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Para corrigir um dia específico (feriado, troca de turno combinada, etc) sem mexer na escala toda.</p>
         <div class="linha">
-          <div><label>Data</label><input type="date" id="ajusteData"></div>
+          <div><label>Data</label><input type="date" id="excecaoData"></div>
           <div>
             <label>Situação</label>
-            <select id="ajusteTrabalha">
-              <option value="sim">Trabalha na escala</option>
-              <option value="nao">Folga (sem bloqueio)</option>
+            <select id="excecaoTrabalha">
+              <option value="nao">Folga nesse dia</option>
+              <option value="sim">Trabalha (turno diferente do normal)</option>
             </select>
           </div>
         </div>
-        <div class="linha" id="ajusteHorasWrap">
-          <div><label>Início do turno</label><input type="time" id="ajusteInicio"></div>
-          <div><label>Fim do turno</label><input type="time" id="ajusteFim"></div>
+        <div class="linha" id="excecaoHorasWrap" style="display:none;">
+          <div><label>Início</label><input type="time" id="excecaoInicio"></div>
+          <div><label>Fim</label><input type="time" id="excecaoFim"></div>
         </div>
-        <button class="acao" onclick="salvarAjusteEscala()">Salvar dia</button>
+        <button class="acao" onclick="salvarExcecao()">Salvar exceção</button>
       </div>
     </section>
 
@@ -355,9 +386,6 @@ const db = getFirestore(app);
 let servicosCache = [];
 let atendimentoEmConclusao = null; // {id, servicosMarcados: Set}
 
-// Escala 2026 da letra A, já calculada a partir da tabela oficial (turno 3x4).
-// Cada dia: {trabalha:false} = folga | {trabalha:true, horaInicio, horaFim} = turno de trabalho daquele dia.
-const ESCALA_A_2026 = {"2026-01-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-02":{"trabalha":false},"2026-01-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-04":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-06":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-08":{"trabalha":false},"2026-01-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-10":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-12":{"trabalha":false},"2026-01-13":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-17":{"trabalha":false},"2026-01-18":{"trabalha":false},"2026-01-19":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-21":{"trabalha":false},"2026-01-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-25":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-27":{"trabalha":false},"2026-01-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-30":{"trabalha":false},"2026-01-31":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-05":{"trabalha":false},"2026-02-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-09":{"trabalha":false},"2026-02-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-14":{"trabalha":false},"2026-02-15":{"trabalha":false},"2026-02-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-18":{"trabalha":false},"2026-02-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-24":{"trabalha":false},"2026-02-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-27":{"trabalha":false},"2026-02-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-05":{"trabalha":false},"2026-03-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-09":{"trabalha":false},"2026-03-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-14":{"trabalha":false},"2026-03-15":{"trabalha":false},"2026-03-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-18":{"trabalha":false},"2026-03-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-24":{"trabalha":false},"2026-03-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-27":{"trabalha":false},"2026-03-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-01":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-02":{"trabalha":false},"2026-04-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-05":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-06":{"trabalha":false},"2026-04-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-08":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-11":{"trabalha":false},"2026-04-12":{"trabalha":false},"2026-04-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-14":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-15":{"trabalha":false},"2026-04-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-20":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-21":{"trabalha":false},"2026-04-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-24":{"trabalha":false},"2026-04-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-27":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-29":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-30":{"trabalha":false},"2026-05-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-02":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-04":{"trabalha":false},"2026-05-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-09":{"trabalha":false},"2026-05-10":{"trabalha":false},"2026-05-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-13":{"trabalha":false},"2026-05-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-17":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-19":{"trabalha":false},"2026-05-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-22":{"trabalha":false},"2026-05-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-24":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-28":{"trabalha":false},"2026-05-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-30":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-01":{"trabalha":false},"2026-06-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-06":{"trabalha":false},"2026-06-07":{"trabalha":false},"2026-06-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-10":{"trabalha":false},"2026-06-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-14":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-16":{"trabalha":false},"2026-06-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-19":{"trabalha":false},"2026-06-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-21":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-25":{"trabalha":false},"2026-06-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-27":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-29":{"trabalha":false},"2026-06-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-02":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-04":{"trabalha":false},"2026-07-05":{"trabalha":false},"2026-07-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-08":{"trabalha":false},"2026-07-09":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-11":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-14":{"trabalha":false},"2026-07-15":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-17":{"trabalha":false},"2026-07-18":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-23":{"trabalha":false},"2026-07-24":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-27":{"trabalha":false},"2026-07-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-30":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-01":{"trabalha":false},"2026-08-02":{"trabalha":false},"2026-08-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-05":{"trabalha":false},"2026-08-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-11":{"trabalha":false},"2026-08-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-14":{"trabalha":false},"2026-08-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-20":{"trabalha":false},"2026-08-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-24":{"trabalha":false},"2026-08-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-29":{"trabalha":false},"2026-08-30":{"trabalha":false},"2026-08-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-02":{"trabalha":false},"2026-09-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-04":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-06":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-08":{"trabalha":false},"2026-09-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-10":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-11":{"trabalha":false},"2026-09-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-13":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-17":{"trabalha":false},"2026-09-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-19":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-21":{"trabalha":false},"2026-09-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-25":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-26":{"trabalha":false},"2026-09-27":{"trabalha":false},"2026-09-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-30":{"trabalha":false},"2026-10-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-06":{"trabalha":false},"2026-10-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-09":{"trabalha":false},"2026-10-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-14":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-15":{"trabalha":false},"2026-10-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-19":{"trabalha":false},"2026-10-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-21":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-24":{"trabalha":false},"2026-10-25":{"trabalha":false},"2026-10-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-27":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-28":{"trabalha":false},"2026-10-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-01":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-02":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-03":{"trabalha":false},"2026-11-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-05":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-06":{"trabalha":false},"2026-11-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-08":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-09":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-11":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-12":{"trabalha":false},"2026-11-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-14":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-15":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-16":{"trabalha":false},"2026-11-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-18":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-20":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-21":{"trabalha":false},"2026-11-22":{"trabalha":false},"2026-11-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-24":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-25":{"trabalha":false},"2026-11-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-27":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-29":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-30":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-01":{"trabalha":false},"2026-12-02":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-04":{"trabalha":false},"2026-12-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-10":{"trabalha":false},"2026-12-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-14":{"trabalha":false},"2026-12-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-17":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-19":{"trabalha":false},"2026-12-20":{"trabalha":false},"2026-12-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-23":{"trabalha":false},"2026-12-24":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-29":{"trabalha":false},"2026-12-30":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true}};
 
 // ---------- Login ----------
 window.fazerLogin = async function(){
@@ -413,6 +441,7 @@ function iniciarPainel(){
   carregarBloqueios();
   carregarDashboard();
   carregarDiasSemana();
+  carregarEscalaPattern();
 
   document.getElementById("filtroData").addEventListener("change", carregarAgendamentos);
 }
@@ -459,15 +488,15 @@ async function carregarServicos(){
   select.innerHTML = servicosCache.map(s => `<option value="${s.id}">${s.nome} (${s.duracaoMin} min)</option>`).join("");
 }
 
-// ================= DIAS DA SEMANA DISPONÍVEIS =================
+// ================= DIAS E HORÁRIO DE FUNCIONAMENTO =================
 const DIAS_SEMANA = [
-  {chave:"dom", label:"Dom"},
-  {chave:"seg", label:"Seg"},
-  {chave:"ter", label:"Ter"},
-  {chave:"qua", label:"Qua"},
-  {chave:"qui", label:"Qui"},
-  {chave:"sex", label:"Sex"},
-  {chave:"sab", label:"Sáb"},
+  {chave:"dom", label:"Domingo"},
+  {chave:"seg", label:"Segunda"},
+  {chave:"ter", label:"Terça"},
+  {chave:"qua", label:"Quarta"},
+  {chave:"qui", label:"Quinta"},
+  {chave:"sex", label:"Sexta"},
+  {chave:"sab", label:"Sábado"},
 ];
 
 async function carregarDiasSemana(){
@@ -476,63 +505,107 @@ async function carregarDiasSemana(){
   const el = document.getElementById("listaDiasSemana");
   el.innerHTML = "";
   DIAS_SEMANA.forEach(d => {
-    const aberto = dados[d.chave] !== false; // padrão: aberto, a menos que explicitamente false
-    const label = document.createElement("label");
-    label.style.cssText = "display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);";
-    label.innerHTML = `
-      <span>${d.label}</span>
-      <input type="checkbox" id="dia_${d.chave}" style="width:18px; height:18px;" ${aberto ? "checked" : ""}>
+    const cfg = dados[d.chave] || {};
+    const aberto = cfg.aberto !== false; // padrão: aberto
+    const inicio = cfg.inicio || "08:00";
+    const fim = cfg.fim || "20:00";
+    const div = document.createElement("div");
+    div.className = "linha";
+    div.style.alignItems = "flex-end";
+    div.innerHTML = `
+      <div style="flex:0 0 120px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+          <input type="checkbox" id="diaAberto_${d.chave}" style="width:auto;" ${aberto ? "checked" : ""}>
+          ${d.label}
+        </label>
+      </div>
+      <div><label>Abre</label><input type="time" id="diaInicio_${d.chave}" value="${inicio}"></div>
+      <div><label>Fecha</label><input type="time" id="diaFim_${d.chave}" value="${fim}"></div>
     `;
-    el.appendChild(label);
+    el.appendChild(div);
   });
 }
 
 window.salvarDiasSemana = async function(){
   const valores = {};
   DIAS_SEMANA.forEach(d => {
-    valores[d.chave] = document.getElementById("dia_"+d.chave).checked;
+    valores[d.chave] = {
+      aberto: document.getElementById("diaAberto_"+d.chave).checked,
+      inicio: document.getElementById("diaInicio_"+d.chave).value || "08:00",
+      fim: document.getElementById("diaFim_"+d.chave).value || "20:00",
+    };
   });
   await setDoc(doc(db,"config","diasSemana"), valores);
-  alert("Dias da semana atualizados.");
+  alert("Horários de funcionamento atualizados.");
 };
 
-// ================= ESCALA =================
-window.importarEscala2026 = async function(){
-  const status = document.getElementById("statusImportacao");
-  status.textContent = "Importando...";
-  try{
-    const dias = Object.keys(ESCALA_A_2026);
-    // Firestore permite até 500 operações por lote — 365 dias cabem em 1 lote
-    const lote = writeBatch(db);
-    dias.forEach(data => {
-      lote.set(doc(db,"escalaCalendario",data), ESCALA_A_2026[data]);
-    });
-    await lote.commit();
-    status.textContent = `${dias.length} dias importados com sucesso.`;
-  }catch(e){
-    console.error(e);
-    status.textContent = "Erro ao importar. Veja o console.";
+// ================= ESCALA DE TRABALHO (motor flexível) =================
+document.getElementById("tipoEscala").addEventListener("change", atualizarCamposEscala);
+function atualizarCamposEscala(){
+  const tipo = document.getElementById("tipoEscala").value;
+  document.getElementById("camposAbcd28").classList.toggle("oculto", tipo !== "abcd28");
+  document.getElementById("camposCiclo").classList.toggle("oculto", tipo !== "ciclo");
+}
+
+async function carregarEscalaPattern(){
+  const snap = await getDoc(doc(db,"config","escalaPattern"));
+  const dados = snap.exists() ? snap.data() : {tipo:"nenhuma"};
+  document.getElementById("tipoEscala").value = dados.tipo || "nenhuma";
+  if(dados.tipo === "abcd28"){
+    document.getElementById("escalaLetra").value = dados.letra || "A";
   }
+  if(dados.tipo === "ciclo"){
+    document.getElementById("cicloDiasTrabalho").value = dados.diasTrabalho || "";
+    document.getElementById("cicloDiasFolga").value = dados.diasFolga || "";
+    document.getElementById("cicloHoraInicio").value = dados.horaInicio || "";
+    document.getElementById("cicloHoraFim").value = dados.horaFim || "";
+    document.getElementById("cicloDataReferencia").value = dados.dataReferencia || "";
+  }
+  atualizarCamposEscala();
+}
+
+window.salvarEscalaPattern = async function(){
+  const tipo = document.getElementById("tipoEscala").value;
+  let payload = {tipo};
+
+  if(tipo === "abcd28"){
+    payload.letra = document.getElementById("escalaLetra").value;
+  } else if(tipo === "ciclo"){
+    const diasTrabalho = parseInt(document.getElementById("cicloDiasTrabalho").value);
+    const diasFolga = parseInt(document.getElementById("cicloDiasFolga").value);
+    const horaInicio = document.getElementById("cicloHoraInicio").value;
+    const horaFim = document.getElementById("cicloHoraFim").value;
+    const dataReferencia = document.getElementById("cicloDataReferencia").value;
+    if(!diasTrabalho || !diasFolga || !horaInicio || !horaFim || !dataReferencia){
+      alert("Preencha dias trabalhando, dias de folga, horário do turno e a data de referência.");
+      return;
+    }
+    payload = {tipo, diasTrabalho, diasFolga, horaInicio, horaFim, dataReferencia};
+  }
+
+  await setDoc(doc(db,"config","escalaPattern"), payload);
+  document.getElementById("statusEscalaPattern").textContent = "Escala salva.";
 };
 
-document.getElementById("ajusteTrabalha").addEventListener("change", (e) => {
-  document.getElementById("ajusteHorasWrap").style.display = e.target.value === "sim" ? "flex" : "none";
+// ================= EXCEÇÃO PONTUAL =================
+document.getElementById("excecaoTrabalha").addEventListener("change", (e) => {
+  document.getElementById("excecaoHorasWrap").style.display = e.target.value === "sim" ? "flex" : "none";
 });
 
-window.salvarAjusteEscala = async function(){
-  const data = document.getElementById("ajusteData").value;
-  const trabalha = document.getElementById("ajusteTrabalha").value === "sim";
+window.salvarExcecao = async function(){
+  const data = document.getElementById("excecaoData").value;
+  const trabalha = document.getElementById("excecaoTrabalha").value === "sim";
   if(!data){ alert("Escolha uma data."); return; }
 
   if(!trabalha){
-    await setDoc(doc(db,"escalaCalendario",data), { trabalha:false });
+    await setDoc(doc(db,"escalaExcecoes",data), { trabalha:false });
   } else {
-    const horaInicio = document.getElementById("ajusteInicio").value;
-    const horaFim = document.getElementById("ajusteFim").value;
+    const horaInicio = document.getElementById("excecaoInicio").value;
+    const horaFim = document.getElementById("excecaoFim").value;
     if(!horaInicio || !horaFim){ alert("Preencha início e fim do turno."); return; }
-    await setDoc(doc(db,"escalaCalendario",data), { trabalha:true, horaInicio, horaFim });
+    await setDoc(doc(db,"escalaExcecoes",data), { trabalha:true, horaInicio, horaFim });
   }
-  alert(`Dia ${data} atualizado.`);
+  alert(`Exceção salva para ${data}.`);
 };
 
 // ================= BLOQUEIOS MANUAIS =================
