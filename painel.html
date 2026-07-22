@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>meucorte — painel</title>
+<link rel="icon" type="image/png" href="favicon-meucorte.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #171310;
+    --panel: #241D17;
+    --panel-2: #2E251D;
+    --line: #3a2f24;
+    --text: #EFE6D8;
+    --text-dim: #ab9f8e;
+    --brass: #B08A4A;
+    --brass-dim: #8a6c39;
+    --open: #6B8F71;
+    --blocked: #8C3F2E;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding: 22px 20px;
+    border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  header h1{
+    font-family:'Bebas Neue'; letter-spacing:1.5px; font-size:26px; margin:0;
+  }
+  header button{
+    background:none; border:1px solid var(--line); color:var(--text-dim);
+    padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px;
+  }
+
+  #telaLogin{
+    max-width:340px; margin: 70px auto; padding:24px;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    text-align:center;
+  }
+  #telaLogin img.logo{ width:90px; height:90px; margin: 0 auto 8px; display:block; }
+  #telaLogin h2{ font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); margin-top:0; }
+  #telaLogin input{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:11px; border-radius:8px; margin-bottom:10px; font-family:'Inter'; text-align:left;
+  }
+  #telaLogin button{
+    width:100%; background:var(--brass); color:#1b1510; border:none; padding:12px;
+    border-radius:8px; font-family:'Bebas Neue'; letter-spacing:1px; font-size:16px; cursor:pointer;
+  }
+  #erroLogin{ color:var(--blocked); font-size:12px; min-height:16px; }
+
+  header img.logo{ width:38px; height:38px; }
+  header .titulo-header{ display:flex; align-items:center; gap:10px; }
+
+  nav.tabs{
+    display:flex; gap:6px; padding: 14px 16px 0; flex-wrap:wrap;
+  }
+  nav.tabs button{
+    background: var(--panel-2); border:1px solid var(--line); color:var(--text-dim);
+    padding:9px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:13px;
+  }
+  nav.tabs button.ativo{ background:var(--panel); color:var(--brass); border-color:var(--brass-dim); }
+
+  main{ max-width:760px; margin:0 auto; padding: 0 16px 60px; }
+  section.aba{ display:none; padding-top:18px; }
+  section.aba.ativa{ display:block; }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px;
+  }
+  .card h3{ font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); margin:0 0 12px; font-size:18px; }
+
+  .linha{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .linha > *{ flex:1; min-width:110px; }
+  label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; }
+  input, select, textarea{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:10px; border-radius:8px; font-family:'Inter'; font-size:14px;
+  }
+  button.acao{
+    background:var(--brass); color:#1b1510; border:none; padding:10px 16px;
+    border-radius:8px; font-family:'Bebas Neue'; letter-spacing:1px; font-size:15px; cursor:pointer;
+  }
+  button.secundario{
+    background:transparent; border:1px solid var(--line); color:var(--text-dim);
+    padding:8px 12px; border-radius:8px; cursor:pointer; font-size:12px;
+  }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th{ color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  td.acoes{ text-align:right; white-space:nowrap; }
+  td.acoes button{ margin-left:6px; }
+
+  .badge{ padding:2px 8px; border-radius:20px; font-size:11px; }
+  .badge.particular{ background:rgba(107,143,113,.2); color:var(--open); }
+  .badge.escala{ background:rgba(140,63,46,.2); color:var(--blocked); }
+  .badge.manual{ background:rgba(176,138,74,.2); color:var(--brass); }
+
+  .vazio{ color:var(--text-dim); font-size:13px; text-align:center; padding:20px 0; }
+  .oculto{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="telaLogin">
+  <img src="logo-meucorte.png" alt="meucorte" class="logo">
+  <h2>meucorte — painel</h2>
+  <label>E-mail</label>
+  <input type="email" id="loginEmail" placeholder="seu@email.com">
+  <label>Senha</label>
+  <input type="password" id="loginSenha" placeholder="••••••••">
+  <button onclick="fazerLogin()">Entrar</button>
+  <p id="erroLogin"></p>
+</div>
+
+<div id="app" class="oculto">
+  <header>
+    <div class="titulo-header">
+      <img src="logo-meucorte.png" alt="meucorte" class="logo">
+      <h1>meucorte — painel</h1>
+    </div>
+    <button onclick="fazerLogout()">Sair</button>
+  </header>
+
+
+  <nav class="tabs">
+    <button data-aba="agenda" class="ativo">Agenda</button>
+    <button data-aba="clientes">Clientes</button>
+    <button data-aba="dashboard">Financeiro</button>
+    <button data-aba="servicos">Serviços</button>
+    <button data-aba="escala">Escala</button>
+    <button data-aba="bloqueios">Bloqueios manuais</button>
+  </nav>
+
+  <main>
+
+    <!-- AGENDA -->
+    <section class="aba ativa" id="aba-agenda">
+      <div class="card">
+        <h3>Agendamentos</h3>
+        <div class="linha">
+          <div><label>Data</label><input type="date" id="filtroData"></div>
+        </div>
+        <table id="tabelaAgendamentos">
+          <thead><tr><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card oculto" id="painelConcluir">
+        <h3>Concluir atendimento</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Marque os serviços realmente realizados nesse atendimento. O valor final é recalculado automaticamente.</p>
+        <div id="listaServicosConclusao"></div>
+        <div class="resumoConclusao" style="margin:12px 0; font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); font-size:18px;">
+          Total: <span id="valorFinalConclusao">R$ 0,00</span>
+        </div>
+        <button class="acao" onclick="confirmarConclusao()">Confirmar conclusão</button>
+        <button class="secundario" onclick="fecharPainelConclusao()">Cancelar</button>
+      </div>
+
+      <div class="card">
+        <h3>Adicionar agendamento manual</h3>
+        <div class="linha">
+          <div><label>Data</label><input type="date" id="manualData"></div>
+          <div><label>Hora início</label><input type="time" id="manualHoraInicio"></div>
+        </div>
+        <div class="linha">
+          <div><label>Serviço</label><select id="manualServico"></select></div>
+          <div><label>Cliente</label><input type="text" id="manualCliente" placeholder="Nome do cliente"></div>
+        </div>
+        <div class="linha">
+          <div><label>Telefone (opcional)</label><input type="text" id="manualTelefone"></div>
+          <div><label>Endereço (opcional)</label><input type="text" id="manualEndereco" placeholder="Rua, número, bairro"></div>
+        </div>
+        <label>Comentário (opcional)</label>
+        <textarea id="manualComentario" rows="2"></textarea>
+        <br><br>
+        <button class="acao" onclick="salvarAgendamentoManual()">Salvar agendamento</button>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS -->
+    <section class="aba" id="aba-servicos">
+      <div class="card">
+        <h3>Novo serviço</h3>
+        <div class="linha">
+          <div><label>Nome</label><input type="text" id="servNome" placeholder="Ex: Corte + Barba"></div>
+          <div><label>Valor (R$)</label><input type="number" id="servValor" step="0.01"></div>
+          <div><label>Duração (min)</label><input type="number" id="servDuracao" step="5"></div>
+        </div>
+        <button class="acao" onclick="salvarServico()">Adicionar serviço</button>
+      </div>
+      <div class="card">
+        <h3>Serviços cadastrados</h3>
+        <table id="tabelaServicos">
+          <thead><tr><th>Nome</th><th>Valor</th><th>Duração</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ESCALA -->
+    <section class="aba" id="aba-escala">
+      <div class="card">
+        <h3>Dias da semana abertos para agendamento particular</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Desmarque os dias em que você não quer receber agendamento de cliente. Nesses dias a agenda fica fechada — só você consegue marcar algo manualmente, se precisar.</p>
+        <div id="listaDiasSemana" style="display:flex; flex-wrap:wrap; gap:14px; margin:12px 0;"></div>
+        <button class="acao" onclick="salvarDiasSemana()">Salvar dias</button>
+      </div>
+      <div class="card">
+        <h3>Importar escala 2026 (letra A)</h3>
+        <p style="color:var(--text-dim); font-size:13px;">
+          Já está com os 365 dias de 2026 calculados a partir da tabela oficial (turno 3x4 letras).
+          Um clique grava tudo em <code>escalaCalendario</code>: dias de trabalho da letra A (com o turno do dia) e dias de folga.
+          O bloqueio na agenda particular já soma 1h30 automaticamente depois do turno.
+        </p>
+        <button class="acao" onclick="importarEscala2026()">Importar escala 2026</button>
+        <span id="statusImportacao" style="margin-left:10px; font-size:13px; color:var(--text-dim);"></span>
+      </div>
+      <div class="card">
+        <h3>Ajustar um dia manualmente</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Use isso só para corrigir uma exceção pontual (troca de turno, folga combinada, etc).</p>
+        <div class="linha">
+          <div><label>Data</label><input type="date" id="ajusteData"></div>
+          <div>
+            <label>Situação</label>
+            <select id="ajusteTrabalha">
+              <option value="sim">Trabalha na escala</option>
+              <option value="nao">Folga (sem bloqueio)</option>
+            </select>
+          </div>
+        </div>
+        <div class="linha" id="ajusteHorasWrap">
+          <div><label>Início do turno</label><input type="time" id="ajusteInicio"></div>
+          <div><label>Fim do turno</label><input type="time" id="ajusteFim"></div>
+        </div>
+        <button class="acao" onclick="salvarAjusteEscala()">Salvar dia</button>
+      </div>
+    </section>
+
+    <!-- BLOQUEIOS MANUAIS -->
+    <section class="aba" id="aba-bloqueios">
+      <div class="card">
+        <h3>Fechar horário fora da escala</h3>
+        <div class="linha">
+          <div><label>Data</label><input type="date" id="bloqData"></div>
+          <div><label>Hora início</label><input type="time" id="bloqInicio"></div>
+          <div><label>Hora fim</label><input type="time" id="bloqFim"></div>
+        </div>
+        <label>Motivo (opcional)</label>
+        <input type="text" id="bloqMotivo" placeholder="Ex: compromisso pessoal">
+        <br><br>
+        <button class="acao" onclick="salvarBloqueioManual()">Fechar horário</button>
+      </div>
+      <div class="card">
+        <h3>Bloqueios cadastrados</h3>
+        <table id="tabelaBloqueios">
+          <thead><tr><th>Data</th><th>Início</th><th>Fim</th><th>Motivo</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CLIENTES -->
+    <section class="aba" id="aba-clientes">
+      <div class="card">
+        <h3>Buscar cliente</h3>
+        <div class="linha">
+          <div><label>Telefone</label><input type="text" id="buscaClienteTelefone" placeholder="Telefone do cliente"></div>
+        </div>
+        <button class="acao" onclick="buscarHistoricoCliente()">Buscar histórico</button>
+      </div>
+      <div class="card oculto" id="cardHistoricoCliente">
+        <h3 id="tituloHistoricoCliente">Histórico</h3>
+        <div class="linha" style="font-size:13px; color:var(--text-dim);">
+          <div><b id="totalVisitasCliente">0</b> atendimentos concluídos</div>
+          <div><b id="totalGastoCliente">R$ 0,00</b> gasto total</div>
+        </div>
+        <table id="tabelaHistoricoCliente">
+          <thead><tr><th>Data</th><th>Serviços</th><th>Valor</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="aba" id="aba-dashboard">
+      <div class="card">
+        <h3>Período</h3>
+        <div class="linha">
+          <div><label>De</label><input type="date" id="dashDataInicio"></div>
+          <div><label>Até</label><input type="date" id="dashDataFim"></div>
+        </div>
+        <button class="acao" onclick="carregarDashboard()">Atualizar</button>
+      </div>
+      <div class="card">
+        <h3>Indicadores</h3>
+        <div class="linha" style="font-size:14px;">
+          <div>
+            <div style="color:var(--text-dim); font-size:12px;">Atendimentos concluídos</div>
+            <div style="font-family:'Bebas Neue'; font-size:26px; color:var(--brass);" id="dashQtd">0</div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:12px;">Faturamento</div>
+            <div style="font-family:'Bebas Neue'; font-size:26px; color:var(--brass);" id="dashFaturamento">R$ 0,00</div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:12px;">Ticket médio</div>
+            <div style="font-family:'Bebas Neue'; font-size:26px; color:var(--brass);" id="dashTicket">R$ 0,00</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, getDocs, addDoc, deleteDoc, doc, setDoc, getDoc, updateDoc,
+  query, where, orderBy, Timestamp, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ====== CONFIGURAÇÃO FIREBASE — troque pelos dados do seu projeto ======
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJETO",
+  storageBucket: "SEU_PROJETO.appspot.com",
+  messagingSenderId: "SEU_SENDER_ID",
+  appId: "SEU_APP_ID"
+};
+// =========================================================================
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let servicosCache = [];
+let atendimentoEmConclusao = null; // {id, servicosMarcados: Set}
+
+// Escala 2026 da letra A, já calculada a partir da tabela oficial (turno 3x4).
+// Cada dia: {trabalha:false} = folga | {trabalha:true, horaInicio, horaFim} = turno de trabalho daquele dia.
+const ESCALA_A_2026 = {"2026-01-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-02":{"trabalha":false},"2026-01-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-04":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-06":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-08":{"trabalha":false},"2026-01-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-10":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-12":{"trabalha":false},"2026-01-13":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-17":{"trabalha":false},"2026-01-18":{"trabalha":false},"2026-01-19":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-21":{"trabalha":false},"2026-01-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-01-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-25":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-01-27":{"trabalha":false},"2026-01-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-01-30":{"trabalha":false},"2026-01-31":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-05":{"trabalha":false},"2026-02-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-09":{"trabalha":false},"2026-02-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-14":{"trabalha":false},"2026-02-15":{"trabalha":false},"2026-02-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-18":{"trabalha":false},"2026-02-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-02-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-02-24":{"trabalha":false},"2026-02-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-02-27":{"trabalha":false},"2026-02-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-05":{"trabalha":false},"2026-03-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-09":{"trabalha":false},"2026-03-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-14":{"trabalha":false},"2026-03-15":{"trabalha":false},"2026-03-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-18":{"trabalha":false},"2026-03-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-03-24":{"trabalha":false},"2026-03-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-03-27":{"trabalha":false},"2026-03-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-03-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-01":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-02":{"trabalha":false},"2026-04-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-05":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-06":{"trabalha":false},"2026-04-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-08":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-11":{"trabalha":false},"2026-04-12":{"trabalha":false},"2026-04-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-14":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-15":{"trabalha":false},"2026-04-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-20":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-21":{"trabalha":false},"2026-04-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-04-24":{"trabalha":false},"2026-04-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-27":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-04-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-29":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-04-30":{"trabalha":false},"2026-05-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-02":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-04":{"trabalha":false},"2026-05-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-09":{"trabalha":false},"2026-05-10":{"trabalha":false},"2026-05-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-13":{"trabalha":false},"2026-05-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-17":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-19":{"trabalha":false},"2026-05-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-22":{"trabalha":false},"2026-05-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-24":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-05-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-05-28":{"trabalha":false},"2026-05-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-30":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-05-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-01":{"trabalha":false},"2026-06-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-06":{"trabalha":false},"2026-06-07":{"trabalha":false},"2026-06-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-10":{"trabalha":false},"2026-06-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-14":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-16":{"trabalha":false},"2026-06-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-19":{"trabalha":false},"2026-06-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-21":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-06-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-06-25":{"trabalha":false},"2026-06-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-27":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-06-29":{"trabalha":false},"2026-06-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-02":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-04":{"trabalha":false},"2026-07-05":{"trabalha":false},"2026-07-06":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-08":{"trabalha":false},"2026-07-09":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-11":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-12":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-14":{"trabalha":false},"2026-07-15":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-17":{"trabalha":false},"2026-07-18":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-19":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-21":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-23":{"trabalha":false},"2026-07-24":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-25":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-07-27":{"trabalha":false},"2026-07-28":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-07-30":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-07-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-01":{"trabalha":false},"2026-08-02":{"trabalha":false},"2026-08-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-05":{"trabalha":false},"2026-08-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-11":{"trabalha":false},"2026-08-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-14":{"trabalha":false},"2026-08-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-20":{"trabalha":false},"2026-08-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-08-24":{"trabalha":false},"2026-08-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-08-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-08-29":{"trabalha":false},"2026-08-30":{"trabalha":false},"2026-08-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-01":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-02":{"trabalha":false},"2026-09-03":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-04":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-06":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-07":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-08":{"trabalha":false},"2026-09-09":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-10":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-11":{"trabalha":false},"2026-09-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-13":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-14":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-15":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-16":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-17":{"trabalha":false},"2026-09-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-19":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-20":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-21":{"trabalha":false},"2026-09-22":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-23":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-09-24":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-25":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-09-26":{"trabalha":false},"2026-09-27":{"trabalha":false},"2026-09-28":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-29":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-09-30":{"trabalha":false},"2026-10-01":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-02":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-03":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-04":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-05":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-06":{"trabalha":false},"2026-10-07":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-08":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-09":{"trabalha":false},"2026-10-10":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-11":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-12":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-13":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-14":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-15":{"trabalha":false},"2026-10-16":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-17":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-18":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-19":{"trabalha":false},"2026-10-20":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-21":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-22":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-23":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-10-24":{"trabalha":false},"2026-10-25":{"trabalha":false},"2026-10-26":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-27":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-10-28":{"trabalha":false},"2026-10-29":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-30":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-10-31":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-01":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-02":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-03":{"trabalha":false},"2026-11-04":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-05":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-06":{"trabalha":false},"2026-11-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-08":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-09":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-10":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-11":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-12":{"trabalha":false},"2026-11-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-14":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-15":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-16":{"trabalha":false},"2026-11-17":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-18":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-19":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-20":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-21":{"trabalha":false},"2026-11-22":{"trabalha":false},"2026-11-23":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-24":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-11-25":{"trabalha":false},"2026-11-26":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-27":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-11-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-29":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-11-30":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-01":{"trabalha":false},"2026-12-02":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-03":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-04":{"trabalha":false},"2026-12-05":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-06":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-07":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-08":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-09":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-10":{"trabalha":false},"2026-12-11":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-12":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-13":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-14":{"trabalha":false},"2026-12-15":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-16":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-17":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-18":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-19":{"trabalha":false},"2026-12-20":{"trabalha":false},"2026-12-21":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-22":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-23":{"trabalha":false},"2026-12-24":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-25":{"horaFim":"08:15","horaInicio":"00:00","trabalha":true},"2026-12-26":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-27":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-28":{"horaFim":"16:45","horaInicio":"08:15","trabalha":true},"2026-12-29":{"trabalha":false},"2026-12-30":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true},"2026-12-31":{"horaFim":"24:00","horaInicio":"16:45","trabalha":true}};
+
+// ---------- Login ----------
+window.fazerLogin = async function(){
+  const email = document.getElementById("loginEmail").value.trim();
+  const senha = document.getElementById("loginSenha").value;
+  document.getElementById("erroLogin").textContent = "";
+  try{
+    await signInWithEmailAndPassword(auth, email, senha);
+  }catch(e){
+    document.getElementById("erroLogin").textContent = "E-mail ou senha inválidos.";
+  }
+};
+window.fazerLogout = function(){ signOut(auth); };
+
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    document.getElementById("telaLogin").classList.add("oculto");
+    document.getElementById("app").classList.remove("oculto");
+    iniciarPainel();
+  } else {
+    document.getElementById("telaLogin").classList.remove("oculto");
+    document.getElementById("app").classList.add("oculto");
+  }
+});
+
+// ---------- Navegação entre abas ----------
+document.querySelectorAll("nav.tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("ativo"));
+    document.querySelectorAll("section.aba").forEach(s=>s.classList.remove("ativa"));
+    btn.classList.add("ativo");
+    document.getElementById("aba-"+btn.dataset.aba).classList.add("ativa");
+  });
+});
+
+function toMinutos(hhmm){ const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
+function toHHMM(min){ const h=Math.floor(min/60).toString().padStart(2,"0"); const m=(min%60).toString().padStart(2,"0"); return `${h}:${m}`; }
+function formatarMoeda(v){ return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+function hoje(){ return new Date().toISOString().slice(0,10); }
+
+function primeiroDiaDoMes(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; }
+
+function iniciarPainel(){
+  document.getElementById("filtroData").value = hoje();
+  document.getElementById("manualData").value = hoje();
+  document.getElementById("bloqData").value = hoje();
+  document.getElementById("ajusteData").value = hoje();
+  document.getElementById("dashDataInicio").value = primeiroDiaDoMes();
+  document.getElementById("dashDataFim").value = hoje();
+
+  carregarServicos();
+  carregarAgendamentos();
+  carregarBloqueios();
+  carregarDashboard();
+  carregarDiasSemana();
+
+  document.getElementById("filtroData").addEventListener("change", carregarAgendamentos);
+}
+
+// ================= SERVIÇOS =================
+window.salvarServico = async function(){
+  const nome = document.getElementById("servNome").value.trim();
+  const valor = parseFloat(document.getElementById("servValor").value);
+  const duracaoMin = parseInt(document.getElementById("servDuracao").value);
+  if(!nome || isNaN(valor) || isNaN(duracaoMin)){ alert("Preencha todos os campos do serviço."); return; }
+
+  await addDoc(collection(db,"servicos"), { nome, valor, duracaoMin });
+  document.getElementById("servNome").value = "";
+  document.getElementById("servValor").value = "";
+  document.getElementById("servDuracao").value = "";
+  carregarServicos();
+};
+
+window.removerServico = async function(id){
+  if(!confirm("Remover este serviço?")) return;
+  await deleteDoc(doc(db,"servicos",id));
+  carregarServicos();
+};
+
+async function carregarServicos(){
+  const snap = await getDocs(collection(db,"servicos"));
+  servicosCache = [];
+  snap.forEach(d => servicosCache.push({id:d.id, ...d.data()}));
+
+  const tbody = document.querySelector("#tabelaServicos tbody");
+  tbody.innerHTML = servicosCache.length ? "" : `<tr><td colspan="4" class="vazio">Nenhum serviço cadastrado</td></tr>`;
+  servicosCache.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${s.nome}</td>
+      <td>${formatarMoeda(s.valor)}</td>
+      <td>${s.duracaoMin} min</td>
+      <td class="acoes"><button class="secundario" onclick="removerServico('${s.id}')">Remover</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const select = document.getElementById("manualServico");
+  select.innerHTML = servicosCache.map(s => `<option value="${s.id}">${s.nome} (${s.duracaoMin} min)</option>`).join("");
+}
+
+// ================= DIAS DA SEMANA DISPONÍVEIS =================
+const DIAS_SEMANA = [
+  {chave:"dom", label:"Dom"},
+  {chave:"seg", label:"Seg"},
+  {chave:"ter", label:"Ter"},
+  {chave:"qua", label:"Qua"},
+  {chave:"qui", label:"Qui"},
+  {chave:"sex", label:"Sex"},
+  {chave:"sab", label:"Sáb"},
+];
+
+async function carregarDiasSemana(){
+  const snap = await getDoc(doc(db,"config","diasSemana"));
+  const dados = snap.exists() ? snap.data() : {};
+  const el = document.getElementById("listaDiasSemana");
+  el.innerHTML = "";
+  DIAS_SEMANA.forEach(d => {
+    const aberto = dados[d.chave] !== false; // padrão: aberto, a menos que explicitamente false
+    const label = document.createElement("label");
+    label.style.cssText = "display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);";
+    label.innerHTML = `
+      <span>${d.label}</span>
+      <input type="checkbox" id="dia_${d.chave}" style="width:18px; height:18px;" ${aberto ? "checked" : ""}>
+    `;
+    el.appendChild(label);
+  });
+}
+
+window.salvarDiasSemana = async function(){
+  const valores = {};
+  DIAS_SEMANA.forEach(d => {
+    valores[d.chave] = document.getElementById("dia_"+d.chave).checked;
+  });
+  await setDoc(doc(db,"config","diasSemana"), valores);
+  alert("Dias da semana atualizados.");
+};
+
+// ================= ESCALA =================
+window.importarEscala2026 = async function(){
+  const status = document.getElementById("statusImportacao");
+  status.textContent = "Importando...";
+  try{
+    const dias = Object.keys(ESCALA_A_2026);
+    // Firestore permite até 500 operações por lote — 365 dias cabem em 1 lote
+    const lote = writeBatch(db);
+    dias.forEach(data => {
+      lote.set(doc(db,"escalaCalendario",data), ESCALA_A_2026[data]);
+    });
+    await lote.commit();
+    status.textContent = `${dias.length} dias importados com sucesso.`;
+  }catch(e){
+    console.error(e);
+    status.textContent = "Erro ao importar. Veja o console.";
+  }
+};
+
+document.getElementById("ajusteTrabalha").addEventListener("change", (e) => {
+  document.getElementById("ajusteHorasWrap").style.display = e.target.value === "sim" ? "flex" : "none";
+});
+
+window.salvarAjusteEscala = async function(){
+  const data = document.getElementById("ajusteData").value;
+  const trabalha = document.getElementById("ajusteTrabalha").value === "sim";
+  if(!data){ alert("Escolha uma data."); return; }
+
+  if(!trabalha){
+    await setDoc(doc(db,"escalaCalendario",data), { trabalha:false });
+  } else {
+    const horaInicio = document.getElementById("ajusteInicio").value;
+    const horaFim = document.getElementById("ajusteFim").value;
+    if(!horaInicio || !horaFim){ alert("Preencha início e fim do turno."); return; }
+    await setDoc(doc(db,"escalaCalendario",data), { trabalha:true, horaInicio, horaFim });
+  }
+  alert(`Dia ${data} atualizado.`);
+};
+
+// ================= BLOQUEIOS MANUAIS =================
+window.salvarBloqueioManual = async function(){
+  const data = document.getElementById("bloqData").value;
+  const horaInicio = document.getElementById("bloqInicio").value;
+  const horaFim = document.getElementById("bloqFim").value;
+  const motivo = document.getElementById("bloqMotivo").value.trim();
+  if(!data || !horaInicio || !horaFim){ alert("Preencha data, início e fim."); return; }
+
+  await addDoc(collection(db,"bloqueiosManuais"), { data, horaInicio, horaFim, motivo: motivo || null });
+  document.getElementById("bloqMotivo").value = "";
+  carregarBloqueios();
+};
+
+window.removerBloqueio = async function(id){
+  if(!confirm("Remover este bloqueio?")) return;
+  await deleteDoc(doc(db,"bloqueiosManuais",id));
+  carregarBloqueios();
+};
+
+async function carregarBloqueios(){
+  const snap = await getDocs(collection(db,"bloqueiosManuais"));
+  const tbody = document.querySelector("#tabelaBloqueios tbody");
+  const itens = [];
+  snap.forEach(d => itens.push({id:d.id, ...d.data()}));
+  itens.sort((a,b) => (a.data+a.horaInicio).localeCompare(b.data+b.horaInicio));
+
+  tbody.innerHTML = itens.length ? "" : `<tr><td colspan="5" class="vazio">Nenhum bloqueio cadastrado</td></tr>`;
+  itens.forEach(b => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${new Date(b.data+"T00:00:00").toLocaleDateString("pt-BR")}</td>
+      <td>${b.horaInicio}</td>
+      <td>${b.horaFim}</td>
+      <td>${b.motivo || "-"}</td>
+      <td class="acoes"><button class="secundario" onclick="removerBloqueio('${b.id}')">Remover</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ================= AGENDA =================
+window.salvarAgendamentoManual = async function(){
+  const data = document.getElementById("manualData").value;
+  const horaInicio = document.getElementById("manualHoraInicio").value;
+  const servicoId = document.getElementById("manualServico").value;
+  const cliente = document.getElementById("manualCliente").value.trim();
+  const telefone = document.getElementById("manualTelefone").value.trim();
+  const endereco = document.getElementById("manualEndereco").value.trim();
+  const comentario = document.getElementById("manualComentario").value.trim();
+
+  const servico = servicosCache.find(s => s.id === servicoId);
+  if(!data || !horaInicio || !servico || !cliente){
+    alert("Preencha data, hora, serviço e cliente.");
+    return;
+  }
+
+  const inicioMin = toMinutos(horaInicio);
+  const fimMin = inicioMin + servico.duracaoMin;
+  const horaFim = toHHMM(fimMin);
+
+  const refAgendamento = doc(collection(db,"agendamentos"));
+  await setDoc(refAgendamento, {
+    data,
+    horaInicio,
+    horaFim,
+    servicoId: servico.id,
+    servicoNome: servico.nome,
+    valor: servico.valor,
+    duracaoMin: servico.duracaoMin,
+    clienteNome: cliente,
+    clienteTelefone: telefone || null,
+    clienteEndereco: endereco || null,
+    comentario: comentario || null,
+    origem: "manual",
+    status: "agendado",
+    servicosRealizados: [],
+    valorFinal: null,
+    criadoEm: Timestamp.now()
+  });
+
+  // Registro público, sem dados do cliente — o mesmo que a página do cliente usa pra calcular horários livres
+  await setDoc(doc(db,"horariosOcupados", refAgendamento.id), { data, horaInicio, horaFim });
+
+  document.getElementById("manualCliente").value = "";
+  document.getElementById("manualTelefone").value = "";
+  document.getElementById("manualEndereco").value = "";
+  document.getElementById("manualComentario").value = "";
+  carregarAgendamentos();
+};
+
+window.removerAgendamento = async function(id){
+  if(!confirm("Remover este agendamento?")) return;
+  await deleteDoc(doc(db,"agendamentos",id));
+  await deleteDoc(doc(db,"horariosOcupados",id)).catch(()=>{}); // pode não existir se já tinha sido limpo antes
+  carregarAgendamentos();
+};
+
+let agendamentosCache = [];
+
+async function carregarAgendamentos(){
+  const data = document.getElementById("filtroData").value || hoje();
+  const snap = await getDocs(query(collection(db,"agendamentos"), where("data","==",data)));
+  agendamentosCache = [];
+  snap.forEach(d => agendamentosCache.push({id:d.id, ...d.data()}));
+  agendamentosCache.sort((a,b) => a.horaInicio.localeCompare(b.horaInicio));
+
+  const tbody = document.querySelector("#tabelaAgendamentos tbody");
+  tbody.innerHTML = agendamentosCache.length ? "" : `<tr><td colspan="6" class="vazio">Nenhum agendamento nesse dia</td></tr>`;
+  agendamentosCache.forEach(a => {
+    const status = a.status || "agendado";
+    const badgeStatus = status === "concluido"
+      ? `<span class="badge particular">concluído</span>`
+      : status === "cancelado"
+        ? `<span class="badge escala">cancelado</span>`
+        : `<span class="badge manual">agendado</span>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${a.horaInicio}-${a.horaFim}</td>
+      <td>${a.clienteNome}${a.clienteTelefone ? `<br><span style="color:var(--text-dim); font-size:11px;">${a.clienteTelefone}</span>` : ""}${a.clienteEndereco ? `<br><span style="color:var(--text-dim); font-size:11px;">${a.clienteEndereco}</span>` : ""}${a.comentario ? `<br><span style="color:var(--text-dim); font-size:11px;">💬 ${a.comentario}</span>` : ""}</td>
+      <td>${a.servicoNome}</td>
+      <td>${formatarMoeda(status === "concluido" && a.valorFinal != null ? a.valorFinal : a.valor)}</td>
+      <td>${badgeStatus}</td>
+      <td class="acoes">
+        ${status === "agendado" ? `<button class="acao" style="padding:6px 10px; font-size:12px;" onclick="abrirConclusao('${a.id}')">Concluir</button>` : ""}
+        <button class="secundario" onclick="removerAgendamento('${a.id}')">Remover</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ================= CONCLUSÃO DE ATENDIMENTO =================
+window.abrirConclusao = function(id){
+  const ag = agendamentosCache.find(a => a.id === id);
+  if(!ag) return;
+  atendimentoEmConclusao = { id, marcados: new Set([ag.servicoId]) };
+
+  const el = document.getElementById("listaServicosConclusao");
+  el.innerHTML = "";
+  servicosCache.forEach(s => {
+    const marcado = atendimentoEmConclusao.marcados.has(s.id);
+    const div = document.createElement("label");
+    div.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer;";
+    div.innerHTML = `
+      <input type="checkbox" style="width:auto;" ${marcado ? "checked" : ""} data-servico-id="${s.id}">
+      <span>${s.nome} — ${formatarMoeda(s.valor)}</span>
+    `;
+    div.querySelector("input").addEventListener("change", (e) => {
+      if(e.target.checked) atendimentoEmConclusao.marcados.add(s.id);
+      else atendimentoEmConclusao.marcados.delete(s.id);
+      atualizarValorConclusao();
+    });
+    el.appendChild(div);
+  });
+
+  atualizarValorConclusao();
+  document.getElementById("painelConcluir").classList.remove("oculto");
+  document.getElementById("painelConcluir").scrollIntoView({behavior:"smooth"});
+};
+
+function atualizarValorConclusao(){
+  const total = servicosCache
+    .filter(s => atendimentoEmConclusao.marcados.has(s.id))
+    .reduce((soma,s) => soma + s.valor, 0);
+  document.getElementById("valorFinalConclusao").textContent = formatarMoeda(total);
+}
+
+window.fecharPainelConclusao = function(){
+  atendimentoEmConclusao = null;
+  document.getElementById("painelConcluir").classList.add("oculto");
+};
+
+window.confirmarConclusao = async function(){
+  if(!atendimentoEmConclusao) return;
+  const servicosRealizados = servicosCache
+    .filter(s => atendimentoEmConclusao.marcados.has(s.id))
+    .map(s => ({servicoId:s.id, nome:s.nome, valor:s.valor}));
+  const valorFinal = servicosRealizados.reduce((soma,s) => soma + s.valor, 0);
+
+  await updateDoc(doc(db,"agendamentos",atendimentoEmConclusao.id), {
+    status: "concluido",
+    servicosRealizados,
+    valorFinal,
+    concluidoEm: Timestamp.now()
+  });
+
+  fecharPainelConclusao();
+  carregarAgendamentos();
+  carregarDashboard();
+};
+
+// ================= HISTÓRICO DE CLIENTE =================
+window.buscarHistoricoCliente = async function(){
+  const telefone = document.getElementById("buscaClienteTelefone").value.trim();
+  if(!telefone){ alert("Informe o telefone do cliente."); return; }
+
+  const snap = await getDocs(query(collection(db,"agendamentos"), where("clienteTelefone","==",telefone)));
+  const itens = [];
+  snap.forEach(d => itens.push({id:d.id, ...d.data()}));
+  itens.sort((a,b) => b.data.localeCompare(a.data));
+
+  const card = document.getElementById("cardHistoricoCliente");
+  card.classList.remove("oculto");
+  document.getElementById("tituloHistoricoCliente").textContent = itens.length
+    ? `Histórico de ${itens[0].clienteNome}`
+    : "Nenhum agendamento encontrado";
+
+  const concluidos = itens.filter(a => a.status === "concluido");
+  const totalGasto = concluidos.reduce((soma,a) => soma + (a.valorFinal != null ? a.valorFinal : a.valor), 0);
+  document.getElementById("totalVisitasCliente").textContent = concluidos.length;
+  document.getElementById("totalGastoCliente").textContent = formatarMoeda(totalGasto);
+
+  const tbody = document.querySelector("#tabelaHistoricoCliente tbody");
+  tbody.innerHTML = itens.length ? "" : `<tr><td colspan="4" class="vazio">Sem histórico para esse telefone</td></tr>`;
+  itens.forEach(a => {
+    const servicos = (a.servicosRealizados && a.servicosRealizados.length)
+      ? a.servicosRealizados.map(s => s.nome).join(", ")
+      : a.servicoNome;
+    const valor = a.status === "concluido" && a.valorFinal != null ? a.valorFinal : a.valor;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${new Date(a.data+"T00:00:00").toLocaleDateString("pt-BR")}</td>
+      <td>${servicos}</td>
+      <td>${formatarMoeda(valor)}</td>
+      <td>${a.status || "agendado"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+};
+
+// ================= DASHBOARD FINANCEIRO =================
+window.carregarDashboard = async function(){
+  const inicio = document.getElementById("dashDataInicio").value;
+  const fim = document.getElementById("dashDataFim").value;
+  if(!inicio || !fim) return;
+
+  const snap = await getDocs(query(
+    collection(db,"agendamentos"),
+    where("data",">=",inicio),
+    where("data","<=",fim)
+  ));
+
+  let qtd = 0, total = 0;
+  snap.forEach(d => {
+    const a = d.data();
+    if(a.status === "concluido"){
+      qtd++;
+      total += (a.valorFinal != null ? a.valorFinal : a.valor);
+    }
+  });
+
+  document.getElementById("dashQtd").textContent = qtd;
+  document.getElementById("dashFaturamento").textContent = formatarMoeda(total);
+  document.getElementById("dashTicket").textContent = formatarMoeda(qtd ? total/qtd : 0);
+};
+</script>
+</body>
+</html>
