@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>meucorte — painel</title>
+<title>Meu Corte — painel</title>
 <link rel="icon" type="image/png" href="favicon-meucorte.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -115,8 +115,8 @@
 <body>
 
 <div id="telaLogin">
-  <img src="logo-meucorte.png" alt="meucorte" class="logo">
-  <h2>meucorte — painel</h2>
+  <img src="logo-meucorte.png" alt="Meu Corte" class="logo">
+  <h2>Meu Corte — painel</h2>
   <label>E-mail</label>
   <input type="email" id="loginEmail" placeholder="seu@email.com">
   <label>Senha</label>
@@ -128,8 +128,8 @@
 <div id="app" class="oculto">
   <header>
     <div class="titulo-header">
-      <img src="logo-meucorte.png" alt="meucorte" class="logo">
-      <h1>meucorte — painel</h1>
+      <img src="logo-meucorte.png" alt="Meu Corte" class="logo">
+      <h1>Meu Corte — painel</h1>
     </div>
     <button onclick="fazerLogout()">Sair</button>
   </header>
@@ -198,7 +198,18 @@
         <div class="linha">
           <div><label>Nome</label><input type="text" id="servNome" placeholder="Ex: Corte + Barba"></div>
           <div><label>Valor (R$)</label><input type="number" id="servValor" step="0.01"></div>
-          <div><label>Duração (min)</label><input type="number" id="servDuracao" step="5"></div>
+        </div>
+        <div class="linha">
+          <div><label>Duração — horas</label><input type="number" id="servDuracaoHoras" min="0" step="1" placeholder="0"></div>
+          <div>
+            <label>Duração — minutos</label>
+            <select id="servDuracaoMinutos">
+              <option value="0">0</option>
+              <option value="15">15</option>
+              <option value="30">30</option>
+              <option value="45">45</option>
+            </select>
+          </div>
         </div>
         <button class="acao" onclick="salvarServico()">Adicionar serviço</button>
       </div>
@@ -240,6 +251,23 @@
             <option value="D">D</option>
           </select>
           <p style="color:var(--text-dim); font-size:12px; margin-top:6px;">O ciclo já está calibrado com base na tabela oficial de turnos — só escolher a letra.</p>
+
+          <label style="margin-top:14px;">Conferir: uma data que você sabe que trabalha, e qual turno é nesse dia</label>
+          <div class="linha">
+            <div><label>Data</label><input type="date" id="abcd28DataRef"></div>
+            <div>
+              <label>Turno nesse dia</label>
+              <select id="abcd28TurnoRef">
+                <option value="">Selecione…</option>
+                <option value="00:00|08:15">00:00 às 08:15</option>
+                <option value="08:15|16:45">08:15 às 16:45</option>
+                <option value="16:45|24:00">16:45 às 24:00</option>
+                <option value="folga">Estou de folga nesse dia</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" class="secundario" onclick="conferirCalibracaoAbcd28()">Conferir</button>
+          <p id="statusConferenciaAbcd28" style="font-size:13px; margin-top:6px;"></p>
         </div>
 
         <div id="camposCiclo" class="oculto" style="margin-top:12px;">
@@ -383,6 +411,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Ciclo de 28 dias do revezamento 4 turmas / 3 turnos, calibrado com a tabela oficial,
+// com a letra A ancorada em 2026-01-01 (dia 0 do ciclo). null = folga.
+// (mesma tabela usada em index.html, usada aqui só para conferir a calibração)
+const CICLO_ABCD28 = [["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],null,["16:45","24:00"],["16:45","24:00"],["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],null,null,["16:45","24:00"],["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"],["08:15","16:45"],["08:15","16:45"],["08:15","16:45"],null,["16:45","24:00"]];
+const ANCORA_CICLO_ABCD28 = "2026-01-01";
+const OFFSET_LETRA_ABCD28 = {A:0, B:7, C:14, D:21};
+
 let servicosCache = [];
 let atendimentoEmConclusao = null; // {id, servicosMarcados: Set}
 
@@ -426,6 +461,11 @@ function toHHMM(min){ const h=Math.floor(min/60).toString().padStart(2,"0"); con
 function formatarMoeda(v){ return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
 function formatarDuracao(min){ const h=Math.floor(min/60); const m=min%60; if(h===0) return `${m}min`; if(m===0) return `${h}h`; return `${h}h${String(m).padStart(2,"0")}`; }
 function hoje(){ return new Date().toISOString().slice(0,10); }
+function diasEntre(dataInicioStr, dataFimStr){
+  const a = new Date(dataInicioStr+"T00:00:00");
+  const b = new Date(dataFimStr+"T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
 
 function primeiroDiaDoMes(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; }
 
@@ -455,13 +495,16 @@ function iniciarPainel(){
 window.salvarServico = async function(){
   const nome = document.getElementById("servNome").value.trim();
   const valor = parseFloat(document.getElementById("servValor").value);
-  const duracaoMin = parseInt(document.getElementById("servDuracao").value);
-  if(!nome || isNaN(valor) || isNaN(duracaoMin)){ alert("Preencha todos os campos do serviço."); return; }
+  const horas = parseInt(document.getElementById("servDuracaoHoras").value) || 0;
+  const minutos = parseInt(document.getElementById("servDuracaoMinutos").value) || 0;
+  const duracaoMin = horas*60 + minutos;
+  if(!nome || isNaN(valor) || duracaoMin <= 0){ alert("Preencha nome, valor e uma duração maior que zero."); return; }
 
   await addDoc(collection(db,"servicos"), { nome, valor, duracaoMin });
   document.getElementById("servNome").value = "";
   document.getElementById("servValor").value = "";
-  document.getElementById("servDuracao").value = "";
+  document.getElementById("servDuracaoHoras").value = "";
+  document.getElementById("servDuracaoMinutos").value = "0";
   carregarServicos();
 };
 
@@ -558,6 +601,9 @@ async function carregarEscalaPattern(){
   document.getElementById("tipoEscala").value = dados.tipo || "nenhuma";
   if(dados.tipo === "abcd28"){
     document.getElementById("escalaLetra").value = dados.letra || "A";
+    document.getElementById("abcd28DataRef").value = dados.dataRefConferencia || "";
+    document.getElementById("abcd28TurnoRef").value = dados.turnoRefConferencia || "";
+    if(dados.dataRefConferencia && dados.turnoRefConferencia) conferirCalibracaoAbcd28();
   }
   if(dados.tipo === "ciclo"){
     document.getElementById("cicloDiasTrabalho").value = dados.diasTrabalho || "";
@@ -569,12 +615,46 @@ async function carregarEscalaPattern(){
   atualizarCamposEscala();
 }
 
+// Conferência: mostra claramente se a letra escolhida bate com um dia/turno que o barbeiro sabe que é real.
+// Não recalcula nem ajusta nada sozinho — só avisa se há divergência, pra evitar erro silencioso.
+window.conferirCalibracaoAbcd28 = function(){
+  const letra = document.getElementById("escalaLetra").value;
+  const dataRef = document.getElementById("abcd28DataRef").value;
+  const turnoRef = document.getElementById("abcd28TurnoRef").value;
+  const statusEl = document.getElementById("statusConferenciaAbcd28");
+
+  if(!dataRef || !turnoRef){
+    statusEl.textContent = "Escolha a data e o turno para conferir.";
+    statusEl.style.color = "var(--text-dim)";
+    return;
+  }
+
+  const offset = OFFSET_LETRA_ABCD28[letra] || 0;
+  const diff = diasEntre(ANCORA_CICLO_ABCD28, dataRef);
+  const idx = (((diff + offset) % 28) + 28) % 28;
+  const turno = CICLO_ABCD28[idx]; // null (folga) ou [inicio, fim]
+
+  const dataFormatada = new Date(dataRef+"T00:00:00").toLocaleDateString("pt-BR");
+  const calculado = turno ? `trabalha das ${turno[0]} às ${turno[1]}` : "está de folga";
+  const bateu = turnoRef === "folga" ? !turno : (turno && `${turno[0]}|${turno[1]}` === turnoRef);
+
+  if(bateu){
+    statusEl.textContent = `✅ Confere! Com a letra "${letra}", no dia ${dataFormatada} o sistema calcula que você ${calculado} — igual ao que você informou.`;
+    statusEl.style.color = "var(--open)";
+  } else {
+    statusEl.textContent = `⚠️ Não confere. Você informou outra coisa para o dia ${dataFormatada}, mas com a letra "${letra}" o sistema calcula que você ${calculado}. Tente outra letra e conferir de novo.`;
+    statusEl.style.color = "var(--blocked)";
+  }
+};
+
 window.salvarEscalaPattern = async function(){
   const tipo = document.getElementById("tipoEscala").value;
   let payload = {tipo};
 
   if(tipo === "abcd28"){
     payload.letra = document.getElementById("escalaLetra").value;
+    payload.dataRefConferencia = document.getElementById("abcd28DataRef").value || null;
+    payload.turnoRefConferencia = document.getElementById("abcd28TurnoRef").value || null;
   } else if(tipo === "ciclo"){
     const diasTrabalho = parseInt(document.getElementById("cicloDiasTrabalho").value);
     const diasFolga = parseInt(document.getElementById("cicloDiasFolga").value);
