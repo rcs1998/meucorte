@@ -109,6 +109,15 @@
   .item-card .info .dim{ color:var(--text-dim); font-size:12px; }
   .item-card .acoes-card{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .item-card .acoes-card button{ flex:1; min-width:90px; margin:0; }
+
+  .calendario-escala{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:12px; }
+  .calendario-escala .dia-semana{ text-align:center; font-size:10px; color:var(--text-dim); padding:2px 0 6px; text-transform:uppercase; }
+  .calendario-escala .dia{ border:1px solid var(--line); border-radius:6px; padding:4px 2px; text-align:center; font-size:10px; min-height:48px; }
+  .calendario-escala .dia.vazio{ border-color:transparent; }
+  .calendario-escala .dia .numero{ font-weight:700; font-size:13px; display:block; }
+  .calendario-escala .dia.trabalha{ background:rgba(176,138,74,.15); border-color:var(--brass-dim); }
+  .calendario-escala .dia.folga .numero{ color:var(--text-dim); }
+  .calendario-escala .dia.hoje{ outline:2px solid var(--brass); }
   th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   th{ color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   td.acoes{ text-align:right; white-space:nowrap; }
@@ -291,6 +300,17 @@
         <br>
         <button class="acao" onclick="salvarEscalaPattern()">Salvar escala</button>
         <span id="statusEscalaPattern" style="margin-left:10px; font-size:13px; color:var(--text-dim);"></span>
+      </div>
+
+      <div class="card">
+        <h3>Calendário da escala</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Mostra, mês a mês, o que o sistema está calculando pra escala salva — pra você conferir se bate com a sua escala real.</p>
+        <div class="linha" style="align-items:center;">
+          <button type="button" class="secundario" onclick="mudarMesCalendarioEscala(-1)">← Mês anterior</button>
+          <div style="text-align:center; font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); font-size:18px;" id="tituloCalendarioEscala"></div>
+          <button type="button" class="secundario" onclick="mudarMesCalendarioEscala(1)">Próximo mês →</button>
+        </div>
+        <div class="calendario-escala" id="calendarioEscala"></div>
       </div>
 
       <div class="card">
@@ -625,6 +645,90 @@ async function carregarEscalaPattern(){
     document.getElementById("cicloDataReferencia").value = dados.dataReferencia || "";
   }
   atualizarCamposEscala();
+  gerarCalendarioEscala();
+}
+
+// ================= CALENDÁRIO DE CONFERÊNCIA DA ESCALA =================
+let mesCalendarioEscala = new Date().getMonth();
+let anoCalendarioEscala = new Date().getFullYear();
+
+async function calcularEscalaDoDiaPainel(dataStr){
+  const excSnap = await getDoc(doc(db, "escalaExcecoes", dataStr));
+  if(excSnap.exists()) return excSnap.data();
+
+  const patternSnap = await getDoc(doc(db,"config","escalaPattern"));
+  const pattern = patternSnap.exists() ? patternSnap.data() : {tipo:"nenhuma"};
+
+  if(pattern.tipo === "abcd28"){
+    const offset = OFFSET_LETRA_ABCD28[pattern.letra] || 0;
+    const diff = diasEntre(ANCORA_CICLO_ABCD28, dataStr);
+    const idx = (((diff + offset) % 28) + 28) % 28;
+    const turno = CICLO_ABCD28[idx];
+    if(!turno) return {trabalha:false};
+    return {trabalha:true, horaInicio:turno[0], horaFim:turno[1]};
+  }
+
+  if(pattern.tipo === "ciclo"){
+    const total = pattern.diasTrabalho + pattern.diasFolga;
+    const diff = diasEntre(pattern.dataReferencia, dataStr);
+    const pos = ((diff % total) + total) % total;
+    if(pos < pattern.diasTrabalho){
+      return {trabalha:true, horaInicio:pattern.horaInicio, horaFim:pattern.horaFim};
+    }
+    return {trabalha:false};
+  }
+
+  return {trabalha:false};
+}
+
+window.mudarMesCalendarioEscala = function(delta){
+  mesCalendarioEscala += delta;
+  if(mesCalendarioEscala > 11){ mesCalendarioEscala = 0; anoCalendarioEscala++; }
+  if(mesCalendarioEscala < 0){ mesCalendarioEscala = 11; anoCalendarioEscala--; }
+  gerarCalendarioEscala();
+};
+
+async function gerarCalendarioEscala(){
+  const el = document.getElementById("calendarioEscala");
+  const tituloEl = document.getElementById("tituloCalendarioEscala");
+  const nomesMes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  tituloEl.textContent = `${nomesMes[mesCalendarioEscala]} de ${anoCalendarioEscala}`;
+
+  el.innerHTML = "";
+  ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].forEach(d => {
+    const cab = document.createElement("div");
+    cab.className = "dia-semana";
+    cab.textContent = d;
+    el.appendChild(cab);
+  });
+
+  const primeiroDia = new Date(anoCalendarioEscala, mesCalendarioEscala, 1);
+  const diasNoMes = new Date(anoCalendarioEscala, mesCalendarioEscala+1, 0).getDate();
+  const offsetSemana = primeiroDia.getDay();
+  const hojeStr = dataDeHojeLocalPainel();
+
+  for(let i=0; i<offsetSemana; i++){
+    const vazio = document.createElement("div");
+    vazio.className = "dia vazio";
+    el.appendChild(vazio);
+  }
+
+  for(let dia=1; dia<=diasNoMes; dia++){
+    const mesStr = String(mesCalendarioEscala+1).padStart(2,"0");
+    const diaStr = String(dia).padStart(2,"0");
+    const dataStr = `${anoCalendarioEscala}-${mesStr}-${diaStr}`;
+    const escala = await calcularEscalaDoDiaPainel(dataStr);
+
+    const div = document.createElement("div");
+    div.className = "dia " + (escala.trabalha ? "trabalha" : "folga") + (dataStr === hojeStr ? " hoje" : "");
+    div.innerHTML = `<span class="numero">${dia}</span>${escala.trabalha ? `${escala.horaInicio}<br>${escala.horaFim}` : "folga"}`;
+    el.appendChild(div);
+  }
+}
+
+function dataDeHojeLocalPainel(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
 // Conferência: mostra claramente se a letra escolhida bate com um dia/turno que o barbeiro sabe que é real.
