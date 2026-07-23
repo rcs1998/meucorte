@@ -118,6 +118,12 @@
   .calendario-escala .dia.trabalha{ background:rgba(176,138,74,.15); border-color:var(--brass-dim); }
   .calendario-escala .dia.folga .numero{ color:var(--text-dim); }
   .calendario-escala .dia.hoje{ outline:2px solid var(--brass); }
+
+  .legenda-calendario{ display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; font-size:11px; color:var(--text-dim); }
+  .legenda-calendario .dot{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:middle; }
+  .legenda-calendario .dot.trabalha{ background:rgba(176,138,74,.25); border:1px solid var(--brass-dim); }
+  .legenda-calendario .dot.folga{ background:var(--panel-2); border:1px solid var(--line); }
+  .legenda-calendario .dot.hoje{ background:var(--panel-2); border:2px solid var(--brass); }
   th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   th{ color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   td.acoes{ text-align:right; white-space:nowrap; }
@@ -311,6 +317,11 @@
           <button type="button" class="secundario" onclick="mudarMesCalendarioEscala(1)">Próximo mês →</button>
         </div>
         <div class="calendario-escala" id="calendarioEscala"></div>
+        <div class="legenda-calendario">
+          <span><span class="dot trabalha"></span>Trabalha (turno)</span>
+          <span><span class="dot folga"></span>Folga</span>
+          <span><span class="dot hoje"></span>Hoje</span>
+        </div>
       </div>
 
       <div class="card">
@@ -652,33 +663,43 @@ async function carregarEscalaPattern(){
 let mesCalendarioEscala = new Date().getMonth();
 let anoCalendarioEscala = new Date().getFullYear();
 
-async function calcularEscalaDoDiaPainel(dataStr){
-  const excSnap = await getDoc(doc(db, "escalaExcecoes", dataStr));
-  if(excSnap.exists()) return excSnap.data();
-
+async function calcularCalendarioMes(ano, mes){
   const patternSnap = await getDoc(doc(db,"config","escalaPattern"));
   const pattern = patternSnap.exists() ? patternSnap.data() : {tipo:"nenhuma"};
 
-  if(pattern.tipo === "abcd28"){
-    const offset = OFFSET_LETRA_ABCD28[pattern.letra] || 0;
-    const diff = diasEntre(ANCORA_CICLO_ABCD28, dataStr);
-    const idx = (((diff + offset) % 28) + 28) % 28;
-    const turno = CICLO_ABCD28[idx];
-    if(!turno) return {trabalha:false};
-    return {trabalha:true, horaInicio:turno[0], horaFim:turno[1]};
-  }
+  const excSnap = await getDocs(collection(db,"escalaExcecoes"));
+  const excecoes = {};
+  excSnap.forEach(d => { excecoes[d.id] = d.data(); });
 
-  if(pattern.tipo === "ciclo"){
-    const total = pattern.diasTrabalho + pattern.diasFolga;
-    const diff = diasEntre(pattern.dataReferencia, dataStr);
-    const pos = ((diff % total) + total) % total;
-    if(pos < pattern.diasTrabalho){
-      return {trabalha:true, horaInicio:pattern.horaInicio, horaFim:pattern.horaFim};
+  function calcularDia(dataStr){
+    if(excecoes[dataStr]) return excecoes[dataStr];
+
+    if(pattern.tipo === "abcd28"){
+      const offset = OFFSET_LETRA_ABCD28[pattern.letra] || 0;
+      const diff = diasEntre(ANCORA_CICLO_ABCD28, dataStr);
+      const idx = (((diff + offset) % 28) + 28) % 28;
+      const turno = CICLO_ABCD28[idx];
+      return turno ? {trabalha:true, horaInicio:turno[0], horaFim:turno[1]} : {trabalha:false};
     }
+
+    if(pattern.tipo === "ciclo"){
+      const total = pattern.diasTrabalho + pattern.diasFolga;
+      const diff = diasEntre(pattern.dataReferencia, dataStr);
+      const pos = ((diff % total) + total) % total;
+      if(pos < pattern.diasTrabalho) return {trabalha:true, horaInicio:pattern.horaInicio, horaFim:pattern.horaFim};
+      return {trabalha:false};
+    }
+
     return {trabalha:false};
   }
 
-  return {trabalha:false};
+  const diasNoMes = new Date(ano, mes+1, 0).getDate();
+  const resultado = [];
+  for(let dia=1; dia<=diasNoMes; dia++){
+    const dataStr = `${ano}-${String(mes+1).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
+    resultado.push({dia, dataStr, escala: calcularDia(dataStr)});
+  }
+  return resultado;
 }
 
 window.mudarMesCalendarioEscala = function(delta){
@@ -688,42 +709,48 @@ window.mudarMesCalendarioEscala = function(delta){
   gerarCalendarioEscala();
 };
 
+// Token de geração: se o usuário mudar de mês antes da geração anterior terminar,
+// o resultado antigo é descartado em vez de se misturar com o novo (evita bagunça/ordem errada).
+let geracaoCalendarioAtual = 0;
+
 async function gerarCalendarioEscala(){
+  const minhaGeracao = ++geracaoCalendarioAtual;
   const el = document.getElementById("calendarioEscala");
   const tituloEl = document.getElementById("tituloCalendarioEscala");
   const nomesMes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   tituloEl.textContent = `${nomesMes[mesCalendarioEscala]} de ${anoCalendarioEscala}`;
+  el.innerHTML = `<p class="vazio" style="grid-column:1/-1;">Carregando calendário...</p>`;
 
-  el.innerHTML = "";
+  const dias = await calcularCalendarioMes(anoCalendarioEscala, mesCalendarioEscala);
+
+  // Se enquanto isso o usuário já pediu outro mês, descarta esse resultado — não desenha nada.
+  if(minhaGeracao !== geracaoCalendarioAtual) return;
+
+  const primeiroDia = new Date(anoCalendarioEscala, mesCalendarioEscala, 1);
+  const offsetSemana = primeiroDia.getDay();
+  const hojeStr = dataDeHojeLocalPainel();
+
+  const frag = document.createDocumentFragment();
   ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].forEach(d => {
     const cab = document.createElement("div");
     cab.className = "dia-semana";
     cab.textContent = d;
-    el.appendChild(cab);
+    frag.appendChild(cab);
   });
-
-  const primeiroDia = new Date(anoCalendarioEscala, mesCalendarioEscala, 1);
-  const diasNoMes = new Date(anoCalendarioEscala, mesCalendarioEscala+1, 0).getDate();
-  const offsetSemana = primeiroDia.getDay();
-  const hojeStr = dataDeHojeLocalPainel();
-
   for(let i=0; i<offsetSemana; i++){
     const vazio = document.createElement("div");
     vazio.className = "dia vazio";
-    el.appendChild(vazio);
+    frag.appendChild(vazio);
   }
-
-  for(let dia=1; dia<=diasNoMes; dia++){
-    const mesStr = String(mesCalendarioEscala+1).padStart(2,"0");
-    const diaStr = String(dia).padStart(2,"0");
-    const dataStr = `${anoCalendarioEscala}-${mesStr}-${diaStr}`;
-    const escala = await calcularEscalaDoDiaPainel(dataStr);
-
+  dias.forEach(({dia, dataStr, escala}) => {
     const div = document.createElement("div");
     div.className = "dia " + (escala.trabalha ? "trabalha" : "folga") + (dataStr === hojeStr ? " hoje" : "");
     div.innerHTML = `<span class="numero">${dia}</span>${escala.trabalha ? `${escala.horaInicio}<br>${escala.horaFim}` : "folga"}`;
-    el.appendChild(div);
-  }
+    frag.appendChild(div);
+  });
+
+  el.innerHTML = "";
+  el.appendChild(frag);
 }
 
 function dataDeHojeLocalPainel(){
