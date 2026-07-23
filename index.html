@@ -313,6 +313,13 @@ function toHHMM(min){
 function formatarMoeda(v){
   return v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
 }
+function formatarDuracao(min){
+  const h = Math.floor(min/60);
+  const m = min%60;
+  if(h === 0) return `${m}min`;
+  if(m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2,"0")}`;
+}
 function diasEntre(dataInicioStr, dataFimStr){
   const a = new Date(dataInicioStr+"T00:00:00");
   const b = new Date(dataFimStr+"T00:00:00");
@@ -337,7 +344,7 @@ async function carregarServicos(){
     div.innerHTML = `
       <div class="info">
         <b>${s.nome}</b>
-        <span>${s.duracaoMin} min</span>
+        <span>${formatarDuracao(s.duracaoMin)}</span>
       </div>
       <div class="valor">${formatarMoeda(s.valor)}</div>
     `;
@@ -448,47 +455,52 @@ async function atualizarSlotsSeProntos(){
   const el = document.getElementById("listaSlots");
   el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Carregando horários...</p>`;
 
-  const dias = await carregarDiasSemanaConfig();
-  const diaSemana = new Date(dataSelecionada+"T00:00:00").getDay(); // 0=dom ... 6=sáb
-  const chaveDia = DIAS_SEMANA_CHAVES[diaSemana];
-  const configDia = dias[chaveDia];
+  try{
+    const dias = await carregarDiasSemanaConfig();
+    const diaSemana = new Date(dataSelecionada+"T00:00:00").getDay(); // 0=dom ... 6=sáb
+    const chaveDia = DIAS_SEMANA_CHAVES[diaSemana];
+    const configDia = dias[chaveDia];
 
-  if(!configDia.aberto){
-    el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Não atendemos nesse dia da semana. Escolha outra data.</p>`;
-    return;
-  }
-
-  const horaAbertura = toMinutos(configDia.inicio);
-  const horaFechamento = toMinutos(configDia.fim);
-
-  const bloqueios = await buscarBloqueios(dataSelecionada);
-  const duracao = servicoSelecionado.duracaoMin;
-
-  el.innerHTML = "";
-  let algumLivre = false;
-
-  for(let t = horaAbertura; t + duracao <= horaFechamento; t += INTERVALO_SLOT){
-    const fimSlot = t + duracao;
-    const conflita = bloqueios.some(b => sobrepoe(t, fimSlot, b.inicio, b.fim));
-
-    const div = document.createElement("div");
-    div.className = "slot" + (conflita ? " indisponivel" : "");
-    div.textContent = toHHMM(t);
-
-    if(!conflita){
-      algumLivre = true;
-      div.addEventListener("click", () => {
-        document.querySelectorAll(".slot").forEach(x=>x.classList.remove("sel"));
-        div.classList.add("sel");
-        slotSelecionado = {inicio:t, fim:fimSlot};
-        atualizarResumo();
-      });
+    if(!configDia.aberto){
+      el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Não atendemos nesse dia da semana. Escolha outra data.</p>`;
+      return;
     }
-    el.appendChild(div);
-  }
 
-  if(!algumLivre){
-    el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Sem horários livres nesse dia para esse serviço.</p>`;
+    const horaAbertura = toMinutos(configDia.inicio);
+    const horaFechamento = toMinutos(configDia.fim);
+
+    const bloqueios = await buscarBloqueios(dataSelecionada);
+    const duracao = servicoSelecionado.duracaoMin;
+
+    el.innerHTML = "";
+    let algumLivre = false;
+
+    for(let t = horaAbertura; t + duracao <= horaFechamento; t += INTERVALO_SLOT){
+      const fimSlot = t + duracao;
+      const conflita = bloqueios.some(b => sobrepoe(t, fimSlot, b.inicio, b.fim));
+
+      const div = document.createElement("div");
+      div.className = "slot" + (conflita ? " indisponivel" : "");
+      div.textContent = toHHMM(t);
+
+      if(!conflita){
+        algumLivre = true;
+        div.addEventListener("click", () => {
+          document.querySelectorAll(".slot").forEach(x=>x.classList.remove("sel"));
+          div.classList.add("sel");
+          slotSelecionado = {inicio:t, fim:fimSlot};
+          atualizarResumo();
+        });
+      }
+      el.appendChild(div);
+    }
+
+    if(!algumLivre){
+      el.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Sem horários livres nesse dia para esse serviço.</p>`;
+    }
+  }catch(err){
+    console.error("Erro ao carregar horários:", err);
+    el.innerHTML = `<p style="color:var(--blocked); font-size:13px;">Não foi possível carregar os horários (${err.code || err.message || "erro desconhecido"}). Verifique a conexão ou avise o barbeiro.</p>`;
   }
 }
 

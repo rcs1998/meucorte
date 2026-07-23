@@ -424,26 +424,31 @@ document.querySelectorAll("nav.tabs button").forEach(btn => {
 function toMinutos(hhmm){ const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function toHHMM(min){ const h=Math.floor(min/60).toString().padStart(2,"0"); const m=(min%60).toString().padStart(2,"0"); return `${h}:${m}`; }
 function formatarMoeda(v){ return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+function formatarDuracao(min){ const h=Math.floor(min/60); const m=min%60; if(h===0) return `${m}min`; if(m===0) return `${h}h`; return `${h}h${String(m).padStart(2,"0")}`; }
 function hoje(){ return new Date().toISOString().slice(0,10); }
 
 function primeiroDiaDoMes(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; }
 
 function iniciarPainel(){
-  document.getElementById("filtroData").value = hoje();
-  document.getElementById("manualData").value = hoje();
-  document.getElementById("bloqData").value = hoje();
-  document.getElementById("ajusteData").value = hoje();
-  document.getElementById("dashDataInicio").value = primeiroDiaDoMes();
-  document.getElementById("dashDataFim").value = hoje();
+  try{
+    document.getElementById("filtroData").value = hoje();
+    document.getElementById("manualData").value = hoje();
+    document.getElementById("bloqData").value = hoje();
+    document.getElementById("dashDataInicio").value = primeiroDiaDoMes();
+    document.getElementById("dashDataFim").value = hoje();
 
-  carregarServicos();
-  carregarAgendamentos();
-  carregarBloqueios();
-  carregarDashboard();
-  carregarDiasSemana();
-  carregarEscalaPattern();
+    carregarServicos();
+    carregarAgendamentos();
+    carregarBloqueios();
+    carregarDashboard();
+    carregarDiasSemana();
+    carregarEscalaPattern();
 
-  document.getElementById("filtroData").addEventListener("change", carregarAgendamentos);
+    document.getElementById("filtroData").addEventListener("change", carregarAgendamentos);
+  }catch(err){
+    console.error("Erro ao iniciar o painel:", err);
+    alert("Ocorreu um erro ao carregar o painel. Verifique o console (F12) ou avise o desenvolvedor.");
+  }
 }
 
 // ================= SERVIÇOS =================
@@ -478,14 +483,14 @@ async function carregarServicos(){
     tr.innerHTML = `
       <td>${s.nome}</td>
       <td>${formatarMoeda(s.valor)}</td>
-      <td>${s.duracaoMin} min</td>
+      <td>${formatarDuracao(s.duracaoMin)}</td>
       <td class="acoes"><button class="secundario" onclick="removerServico('${s.id}')">Remover</button></td>
     `;
     tbody.appendChild(tr);
   });
 
   const select = document.getElementById("manualServico");
-  select.innerHTML = servicosCache.map(s => `<option value="${s.id}">${s.nome} (${s.duracaoMin} min)</option>`).join("");
+  select.innerHTML = servicosCache.map(s => `<option value="${s.id}">${s.nome} (${formatarDuracao(s.duracaoMin)})</option>`).join("");
 }
 
 // ================= DIAS E HORÁRIO DE FUNCIONAMENTO =================
