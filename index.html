@@ -227,7 +227,7 @@
       <label>Nome</label>
       <input type="text" id="inputNome" placeholder="Seu nome">
       <label>Telefone / WhatsApp</label>
-      <input type="tel" id="inputTelefone" placeholder="(00) 00000-0000">
+      <input type="tel" id="inputTelefone" placeholder="(31) 99999-9999" maxlength="15">
       <label>Endereço completo (atendimento a domicílio)</label>
       <input type="text" id="inputEndereco" placeholder="Rua, número, bairro, complemento">
       <label>Comentário (opcional)</label>
@@ -251,6 +251,12 @@
   <div class="msg oculto" id="msgSucesso">
     <h2>Agendamento confirmado!</h2>
     <p style="color:var(--text-dim)">O barbeiro foi avisado. Você receberá a confirmação em breve.</p>
+    <div class="resumo" style="text-align:left; max-width:320px; margin:20px auto;">
+      <div><span>Serviço</span><span id="sucessoServico">-</span></div>
+      <div><span>Data</span><span id="sucessoData">-</span></div>
+      <div><span>Horário</span><span id="sucessoHorario">-</span></div>
+    </div>
+    <button class="confirmar" id="btnNovoAgendamento" style="max-width:320px; margin:8px auto 0;">Fazer novo agendamento</button>
   </div>
 
 </main>
@@ -279,7 +285,7 @@ const firebaseConfig = {
 
 // ====== CONFIGURAÇÃO EMAILJS — troque pelos dados da sua conta ======
 const EMAILJS_PUBLIC_KEY = "HTO7hOr-_3BU0mUcG";
-const EMAILJS_SERVICE_ID = "service_4rufi68";
+const EMAILJS_SERVICE_ID = "service_dueu4eu";
 const EMAILJS_TEMPLATE_ID = "template_og6y8o8";
 const EMAIL_BARBEIRO = "rodrigocardoso03@outlook.com";
 // =========================================================================
@@ -324,6 +330,13 @@ function diasEntre(dataInicioStr, dataFimStr){
   const a = new Date(dataInicioStr+"T00:00:00");
   const b = new Date(dataFimStr+"T00:00:00");
   return Math.round((b - a) / 86400000);
+}
+function dataDeHojeLocal(){
+  const d = new Date();
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth()+1).padStart(2,"0");
+  const dia = String(d.getDate()).padStart(2,"0");
+  return `${ano}-${mes}-${dia}`;
 }
 
 // ---------- Carregar serviços ----------
@@ -472,12 +485,17 @@ async function atualizarSlotsSeProntos(){
     const bloqueios = await buscarBloqueios(dataSelecionada);
     const duracao = servicoSelecionado.duracaoMin;
 
+    const agora = new Date();
+    const ehHoje = dataSelecionada === dataDeHojeLocal();
+    const minutosAgora = agora.getHours()*60 + agora.getMinutes();
+
     el.innerHTML = "";
     let algumLivre = false;
 
     for(let t = horaAbertura; t + duracao <= horaFechamento; t += INTERVALO_SLOT){
       const fimSlot = t + duracao;
-      const conflita = bloqueios.some(b => sobrepoe(t, fimSlot, b.inicio, b.fim));
+      const jaPassou = ehHoje && t < minutosAgora;
+      const conflita = jaPassou || bloqueios.some(b => sobrepoe(t, fimSlot, b.inicio, b.fim));
 
       const div = document.createElement("div");
       div.className = "slot" + (conflita ? " indisponivel" : "");
@@ -520,11 +538,25 @@ function atualizarResumo(){
   }
 }
 
+document.getElementById("inputData").min = dataDeHojeLocal();
 document.getElementById("inputData").addEventListener("change", (e) => {
   dataSelecionada = e.target.value;
   slotSelecionado = null;
   atualizarSlotsSeProntos();
   atualizarResumo();
+});
+
+// ---------- Telefone: máscara (DD) DDDDD-DDDD e validação obrigatória ----------
+function formatarTelefone(valor){
+  const digitos = valor.replace(/\D/g,"").slice(0,11);
+  if(digitos.length <= 2) return digitos.length ? `(${digitos}` : "";
+  if(digitos.length <= 6) return `(${digitos.slice(0,2)}) ${digitos.slice(2)}`;
+  if(digitos.length <= 10) return `(${digitos.slice(0,2)}) ${digitos.slice(2,6)}-${digitos.slice(6)}`;
+  return `(${digitos.slice(0,2)}) ${digitos.slice(2,7)}-${digitos.slice(7,11)}`;
+}
+const REGEX_TELEFONE_VALIDO = /^\(\d{2}\) \d{4,5}-\d{4}$/;
+document.getElementById("inputTelefone").addEventListener("input", (e) => {
+  e.target.value = formatarTelefone(e.target.value);
 });
 
 // ---------- Lembrar dados neste aparelho (sem conta/login) ----------
@@ -534,7 +566,7 @@ const CHAVE_LOCAL = "barbearia_dados_cliente";
     const salvo = JSON.parse(localStorage.getItem(CHAVE_LOCAL) || "null");
     if(salvo){
       document.getElementById("inputNome").value = salvo.nome || "";
-      document.getElementById("inputTelefone").value = salvo.telefone || "";
+      document.getElementById("inputTelefone").value = formatarTelefone(salvo.telefone || "");
       document.getElementById("inputEndereco").value = salvo.endereco || "";
       document.getElementById("inputLembrar").checked = true;
     }
@@ -549,6 +581,10 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
 
   if(!nome || !telefone || !endereco){
     alert("Nome, telefone e endereço são obrigatórios para confirmar o agendamento.");
+    return;
+  }
+  if(!REGEX_TELEFONE_VALIDO.test(telefone)){
+    alert("Informe o telefone no formato (DDD) 00000-0000, com o número completo.");
     return;
   }
 
@@ -593,9 +629,17 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
       horaFim: dadosAgendamento.horaFim
     });
 
-    // Dispara e-mail de alerta pro barbeiro (via EmailJS)
-    await enviarAlertaEmail(nome, telefone, endereco, comentario);
+    // Dispara e-mail de alerta pro barbeiro (via EmailJS) — falha no e-mail não deve
+    // impedir a confirmação, já que o agendamento já foi salvo no banco.
+    try{
+      await enviarAlertaEmail(nome, telefone, endereco, comentario);
+    }catch(errEmail){
+      console.error("Falha ao enviar e-mail de alerta (agendamento já foi salvo):", errEmail);
+    }
 
+    document.getElementById("sucessoServico").textContent = servicoSelecionado.nome;
+    document.getElementById("sucessoData").textContent = new Date(dataSelecionada+"T00:00:00").toLocaleDateString("pt-BR");
+    document.getElementById("sucessoHorario").textContent = `${toHHMM(slotSelecionado.inicio)} - ${toHHMM(slotSelecionado.fim)}`;
     document.getElementById("areaAgendamento").classList.add("oculto");
     document.getElementById("msgSucesso").classList.remove("oculto");
   }catch(err){
@@ -604,6 +648,10 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
     btn.disabled = false;
     btn.textContent = "Confirmar agendamento";
   }
+});
+
+document.getElementById("btnNovoAgendamento").addEventListener("click", () => {
+  window.location.reload();
 });
 
 async function enviarAlertaEmail(nome, telefone, endereco, comentario){

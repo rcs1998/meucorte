@@ -98,6 +98,8 @@
   }
 
   table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .tabela-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .tabela-scroll table{ min-width:620px; }
   th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   th{ color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   td.acoes{ text-align:right; white-space:nowrap; }
@@ -153,10 +155,12 @@
         <div class="linha">
           <div><label>Data</label><input type="date" id="filtroData"></div>
         </div>
+        <div class="tabela-scroll">
         <table id="tabelaAgendamentos">
           <thead><tr><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Status</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
+        </div>
       </div>
 
       <div class="card oculto" id="painelConcluir">
@@ -215,10 +219,12 @@
       </div>
       <div class="card">
         <h3>Serviços cadastrados</h3>
+        <div class="tabela-scroll">
         <table id="tabelaServicos">
           <thead><tr><th>Nome</th><th>Valor</th><th>Duração</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
+        </div>
       </div>
     </section>
 
@@ -325,10 +331,12 @@
       </div>
       <div class="card">
         <h3>Bloqueios cadastrados</h3>
+        <div class="tabela-scroll">
         <table id="tabelaBloqueios">
           <thead><tr><th>Data</th><th>Início</th><th>Fim</th><th>Motivo</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
+        </div>
       </div>
     </section>
 
@@ -347,10 +355,12 @@
           <div><b id="totalVisitasCliente">0</b> atendimentos concluídos</div>
           <div><b id="totalGastoCliente">R$ 0,00</b> gasto total</div>
         </div>
+        <div class="tabela-scroll">
         <table id="tabelaHistoricoCliente">
           <thead><tr><th>Data</th><th>Serviços</th><th>Valor</th><th>Status</th></tr></thead>
           <tbody></tbody>
         </table>
+        </div>
       </div>
     </section>
 
@@ -808,11 +818,14 @@ async function carregarAgendamentos(){
       : status === "cancelado"
         ? `<span class="badge escala">cancelado</span>`
         : `<span class="badge manual">agendado</span>`;
+    const nomeServicoExibido = (a.servicosRealizados && a.servicosRealizados.length)
+      ? a.servicosRealizados.map(s => s.nome).join(", ")
+      : a.servicoNome;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${a.horaInicio}-${a.horaFim}</td>
       <td>${a.clienteNome}${a.clienteTelefone ? `<br><span style="color:var(--text-dim); font-size:11px;">${a.clienteTelefone}</span>` : ""}${a.clienteEndereco ? `<br><span style="color:var(--text-dim); font-size:11px;">${a.clienteEndereco}</span>` : ""}${a.comentario ? `<br><span style="color:var(--text-dim); font-size:11px;">💬 ${a.comentario}</span>` : ""}</td>
-      <td>${a.servicoNome}</td>
+      <td>${nomeServicoExibido}</td>
       <td>${formatarMoeda(status === "concluido" && a.valorFinal != null ? a.valorFinal : a.valor)}</td>
       <td>${badgeStatus}</td>
       <td class="acoes">
