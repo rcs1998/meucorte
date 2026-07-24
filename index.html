@@ -160,6 +160,10 @@
   .resumo div{ display:flex; justify-content:space-between; padding:3px 0; }
   .resumo .total{ color:var(--brass); font-weight:700; border-top:1px solid var(--line); margin-top:6px; padding-top:8px; }
 
+  .item-conta{ background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:8px; font-size:13px; }
+  .item-conta .dim{ color:var(--text-dim); font-size:12px; margin-top:2px; }
+  #areaStatusConta a{ color:var(--brass); text-decoration:underline; cursor:pointer; }
+
   button.confirmar{
     width:100%;
     background: var(--brass);
@@ -197,11 +201,64 @@
   <h1>Meu Corte</h1>
   <div class="rule"></div>
   <p>Escolha o serviço, o dia e o horário</p>
+  <p id="areaStatusConta" style="font-size:13px; margin-top:10px;"></p>
 </header>
 
 <main>
 
-  <div id="areaAgendamento">
+  <div class="step" id="areaConta">
+    <div id="contaModoLogin">
+      <h2><span class="n">•</span>Entrar</h2>
+      <label>E-mail</label>
+      <input type="email" id="contaLoginEmail" placeholder="seu@email.com">
+      <label>Senha</label>
+      <input type="password" id="contaLoginSenha" placeholder="••••••••">
+      <button class="confirmar" id="btnFazerLoginCliente">Entrar</button>
+      <p id="contaLoginErro" style="color:var(--blocked); font-size:12px; min-height:16px;"></p>
+      <p style="font-size:13px; margin-top:6px;">
+        <a href="#" data-modo-conta="cadastro">Criar conta</a> ·
+        <a href="#" data-modo-conta="esqueci">Esqueci minha senha</a>
+      </p>
+    </div>
+
+    <div class="oculto" id="contaModoCadastro">
+      <h2><span class="n">•</span>Criar conta</h2>
+      <label>Nome</label>
+      <input type="text" id="cadastroNome" placeholder="Seu nome">
+      <label>Telefone / WhatsApp</label>
+      <input type="tel" id="cadastroTelefone" placeholder="(31) 99999-9999" maxlength="15">
+      <label>E-mail</label>
+      <input type="email" id="cadastroEmail" placeholder="seu@email.com">
+      <label>Senha</label>
+      <input type="password" id="cadastroSenha" placeholder="Mínimo 6 caracteres">
+      <button class="confirmar" id="btnCriarContaCliente">Criar conta</button>
+      <p id="cadastroErro" style="color:var(--blocked); font-size:12px; min-height:16px;"></p>
+      <p style="font-size:13px; margin-top:6px;"><a href="#" data-modo-conta="login">Já tenho conta</a></p>
+    </div>
+
+    <div class="oculto" id="contaModoEsqueci">
+      <h2><span class="n">•</span>Esqueci minha senha</h2>
+      <label>E-mail cadastrado</label>
+      <input type="email" id="esqueciEmail" placeholder="seu@email.com">
+      <button class="confirmar" id="btnEnviarRedefinicao">Enviar link de redefinição</button>
+      <p id="esqueciStatus" style="font-size:12px; margin-top:8px; min-height:16px;"></p>
+      <p style="font-size:13px; margin-top:6px;"><a href="#" data-modo-conta="login">Voltar pro login</a></p>
+    </div>
+  </div>
+
+  <div class="oculto" id="areaMinhaConta">
+    <div class="step">
+      <h2><span class="n">•</span>Meus agendamentos</h2>
+      <div id="listaMeusFuturos"><p style="color:var(--text-dim); font-size:13px;">Carregando...</p></div>
+    </div>
+    <button class="confirmar" id="btnNovoAgendamentoConta" style="margin-bottom:24px;">Fazer novo agendamento</button>
+    <div class="step">
+      <h2><span class="n">•</span>Histórico</h2>
+      <div id="listaMeuHistorico"></div>
+    </div>
+  </div>
+
+  <div class="oculto" id="areaAgendamento">
 
     <div class="step">
       <h2><span class="n">1</span>Serviço</h2>
@@ -235,10 +292,6 @@
       <input type="text" id="inputEndereco" placeholder="Rua, número, bairro, complemento">
       <label>Comentário (opcional)</label>
       <textarea id="inputComentario" placeholder="Alguma observação para o barbeiro?"></textarea>
-      <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
-        <input type="checkbox" id="inputLembrar" style="width:auto;">
-        <span style="color:var(--text-dim); font-size:12px;">Lembrar meus dados neste aparelho</span>
-      </label>
     </div>
 
     <div class="resumo" id="resumo" style="display:none;">
@@ -260,6 +313,9 @@
       <div><span>Horário</span><span id="sucessoHorario">-</span></div>
     </div>
     <button class="confirmar" id="btnNovoAgendamento" style="max-width:320px; margin:8px auto 0;">Fazer novo agendamento</button>
+    <p id="linkMeusAgendamentosSucesso" class="oculto" style="text-align:center; margin-top:10px; font-size:13px;">
+      <a href="#" id="linkVerMeusAgendamentos">Ver meus agendamentos</a>
+    </p>
   </div>
 
 </main>
@@ -272,6 +328,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getFirestore, collection, getDocs, doc, getDoc, setDoc, query, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  onAuthStateChanged, sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const DIAS_SEMANA_CHAVES = ["dom","seg","ter","qua","qui","sex","sab"];
 
@@ -295,6 +355,8 @@ const EMAIL_BARBEIRO = "lorenaapsousa97@gmail.com";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+let clienteAtual = null; // {uid, email, nome, telefone} do cliente logado, ou null se visitante
 
 const INTERVALO_SLOT = 15; // granularidade dos horários exibidos, em minutos
 const MARGEM_POS_ESCALA = 90; // 1h30 de bloqueio após a escala
@@ -561,20 +623,180 @@ const REGEX_TELEFONE_VALIDO = /^\(\d{2}\) \d{4,5}-\d{4}$/;
 document.getElementById("inputTelefone").addEventListener("input", (e) => {
   e.target.value = formatarTelefone(e.target.value);
 });
+document.getElementById("cadastroTelefone").addEventListener("input", (e) => {
+  e.target.value = formatarTelefone(e.target.value);
+});
 
-// ---------- Lembrar dados neste aparelho (sem conta/login) ----------
-const CHAVE_LOCAL = "barbearia_dados_cliente";
-(function preencherDadosSalvos(){
+// ---------- Conta do cliente (login / cadastro / esqueci senha) ----------
+function mudarModoConta(modo){
+  document.getElementById("contaModoLogin").classList.toggle("oculto", modo !== "login");
+  document.getElementById("contaModoCadastro").classList.toggle("oculto", modo !== "cadastro");
+  document.getElementById("contaModoEsqueci").classList.toggle("oculto", modo !== "esqueci");
+}
+document.querySelectorAll("[data-modo-conta]").forEach(a => {
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    mudarModoConta(a.dataset.modoConta);
+  });
+});
+
+function traduzirErroAuth(code){
+  const mapa = {
+    "auth/email-already-in-use": "Esse e-mail já tem uma conta. Tente entrar.",
+    "auth/invalid-email": "E-mail inválido.",
+    "auth/weak-password": "Senha muito fraca (mínimo 6 caracteres).",
+    "auth/wrong-password": "Senha incorreta.",
+    "auth/user-not-found": "Não existe conta com esse e-mail.",
+    "auth/invalid-credential": "E-mail ou senha incorretos.",
+    "auth/missing-password": "Informe a senha.",
+    "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente de novo."
+  };
+  return mapa[code] || "Não foi possível completar. Tente novamente.";
+}
+
+document.getElementById("btnCriarContaCliente").addEventListener("click", async () => {
+  const nome = document.getElementById("cadastroNome").value.trim();
+  const telefone = document.getElementById("cadastroTelefone").value.trim();
+  const email = document.getElementById("cadastroEmail").value.trim();
+  const senha = document.getElementById("cadastroSenha").value;
+  const erroEl = document.getElementById("cadastroErro");
+  erroEl.textContent = "";
+
+  if(!nome || !telefone || !email || !senha){
+    erroEl.textContent = "Preencha todos os campos.";
+    return;
+  }
+  if(!REGEX_TELEFONE_VALIDO.test(telefone)){
+    erroEl.textContent = "Informe o telefone no formato (DDD) 00000-0000.";
+    return;
+  }
+  if(senha.length < 6){
+    erroEl.textContent = "A senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
   try{
-    const salvo = JSON.parse(localStorage.getItem(CHAVE_LOCAL) || "null");
-    if(salvo){
-      document.getElementById("inputNome").value = salvo.nome || "";
-      document.getElementById("inputTelefone").value = formatarTelefone(salvo.telefone || "");
-      document.getElementById("inputEndereco").value = salvo.endereco || "";
-      document.getElementById("inputLembrar").checked = true;
-    }
-  }catch(e){ /* localStorage indisponível: segue sem preencher */ }
-})();
+    const cred = await createUserWithEmailAndPassword(auth, email, senha);
+    await setDoc(doc(db,"clientes",cred.user.uid), {nome, telefone, email});
+  }catch(err){
+    erroEl.textContent = traduzirErroAuth(err.code);
+  }
+});
+
+document.getElementById("btnFazerLoginCliente").addEventListener("click", async () => {
+  const email = document.getElementById("contaLoginEmail").value.trim();
+  const senha = document.getElementById("contaLoginSenha").value;
+  const erroEl = document.getElementById("contaLoginErro");
+  erroEl.textContent = "";
+  try{
+    await signInWithEmailAndPassword(auth, email, senha);
+  }catch(err){
+    erroEl.textContent = traduzirErroAuth(err.code);
+  }
+});
+
+document.getElementById("btnEnviarRedefinicao").addEventListener("click", async () => {
+  const email = document.getElementById("esqueciEmail").value.trim();
+  const statusEl = document.getElementById("esqueciStatus");
+  if(!email){
+    statusEl.style.color = "var(--blocked)";
+    statusEl.textContent = "Informe o e-mail.";
+    return;
+  }
+  try{
+    await sendPasswordResetEmail(auth, email);
+  }catch(err){
+    // Não revelamos se o e-mail existe ou não, por segurança — a mensagem é a mesma nos dois casos.
+    console.error(err);
+  }
+  statusEl.style.color = "var(--open)";
+  statusEl.textContent = "Se esse e-mail estiver cadastrado, você vai receber um link para redefinir a senha.";
+});
+
+document.getElementById("btnNovoAgendamentoConta").addEventListener("click", () => {
+  document.getElementById("areaMinhaConta").classList.add("oculto");
+  document.getElementById("areaAgendamento").classList.remove("oculto");
+  document.getElementById("msgSucesso").classList.add("oculto");
+});
+
+async function carregarMeusAgendamentos(){
+  if(!clienteAtual) return;
+  const snap = await getDocs(query(collection(db,"agendamentos"), where("clienteUid","==",clienteAtual.uid)));
+  const todos = [];
+  snap.forEach(d => todos.push({id:d.id, ...d.data()}));
+  const hojeStr = dataDeHojeLocal();
+
+  const futuros = todos
+    .filter(a => a.status === "agendado" && a.data >= hojeStr)
+    .sort((a,b) => (a.data+a.horaInicio).localeCompare(b.data+b.horaInicio));
+  const historico = todos
+    .filter(a => a.status !== "agendado" || a.data < hojeStr)
+    .sort((a,b) => (b.data+b.horaInicio).localeCompare(a.data+a.horaInicio));
+
+  const elFuturos = document.getElementById("listaMeusFuturos");
+  elFuturos.innerHTML = futuros.length ? "" : `<p style="color:var(--text-dim); font-size:13px;">Nenhum agendamento futuro.</p>`;
+  futuros.forEach(a => {
+    const div = document.createElement("div");
+    div.className = "item-conta";
+    div.innerHTML = `
+      <strong>${new Date(a.data+"T00:00:00").toLocaleDateString("pt-BR")} — ${a.horaInicio} às ${a.horaFim}</strong>
+      <div class="dim">${a.servicoNome}</div>
+    `;
+    elFuturos.appendChild(div);
+  });
+
+  const elHist = document.getElementById("listaMeuHistorico");
+  elHist.innerHTML = historico.length ? "" : `<p style="color:var(--text-dim); font-size:13px;">Nenhum atendimento anterior.</p>`;
+  historico.forEach(a => {
+    const nomeServico = (a.servicosRealizados && a.servicosRealizados.length)
+      ? a.servicosRealizados.map(s=>s.nome).join(", ")
+      : a.servicoNome;
+    const div = document.createElement("div");
+    div.className = "item-conta";
+    div.innerHTML = `
+      <strong>${new Date(a.data+"T00:00:00").toLocaleDateString("pt-BR")}</strong>
+      <div class="dim">${nomeServico}${a.status === "cancelado" ? " · cancelado" : ""}</div>
+    `;
+    elHist.appendChild(div);
+  });
+}
+
+window.sairContaCliente = async function(){
+  await signOut(auth);
+};
+
+onAuthStateChanged(auth, async (user) => {
+  const statusEl = document.getElementById("areaStatusConta");
+  if(user){
+    let dadosCliente = {};
+    try{
+      const snap = await getDoc(doc(db,"clientes",user.uid));
+      dadosCliente = snap.exists() ? snap.data() : {};
+    }catch(e){ console.error("Erro ao carregar dados da conta:", e); }
+
+    clienteAtual = {uid:user.uid, email:user.email, nome:dadosCliente.nome || "", telefone:dadosCliente.telefone || "", endereco:dadosCliente.endereco || ""};
+    statusEl.innerHTML = `Olá, ${clienteAtual.nome || clienteAtual.email} · <a href="#" id="linkSairConta">Sair</a>`;
+    document.getElementById("linkSairConta").addEventListener("click", (e) => { e.preventDefault(); sairContaCliente(); });
+
+    document.getElementById("areaConta").classList.add("oculto");
+    document.getElementById("areaAgendamento").classList.add("oculto");
+    document.getElementById("msgSucesso").classList.add("oculto");
+    document.getElementById("areaMinhaConta").classList.remove("oculto");
+
+    if(clienteAtual.nome) document.getElementById("inputNome").value = clienteAtual.nome;
+    if(clienteAtual.telefone) document.getElementById("inputTelefone").value = clienteAtual.telefone;
+    if(clienteAtual.endereco) document.getElementById("inputEndereco").value = clienteAtual.endereco;
+
+    carregarMeusAgendamentos();
+  } else {
+    clienteAtual = null;
+    statusEl.innerHTML = "";
+    document.getElementById("areaMinhaConta").classList.add("oculto");
+    document.getElementById("areaAgendamento").classList.add("oculto");
+    mudarModoConta("login");
+    document.getElementById("areaConta").classList.remove("oculto");
+  }
+});
 
 document.getElementById("btnConfirmar").addEventListener("click", async () => {
   const nome = document.getElementById("inputNome").value.trim();
@@ -590,14 +812,10 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
     alert("Informe o telefone no formato (DDD) 00000-0000, com o número completo.");
     return;
   }
-
-  try{
-    if(document.getElementById("inputLembrar").checked){
-      localStorage.setItem(CHAVE_LOCAL, JSON.stringify({nome, telefone, endereco}));
-    } else {
-      localStorage.removeItem(CHAVE_LOCAL);
-    }
-  }catch(e){ /* localStorage indisponível: segue normalmente sem salvar */ }
+  if(!clienteAtual){
+    alert("Você precisa estar logado para agendar.");
+    return;
+  }
 
   const btn = document.getElementById("btnConfirmar");
   btn.disabled = true;
@@ -621,6 +839,7 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
       status: "agendado",
       servicosRealizados: [],
       valorFinal: null,
+      clienteUid: clienteAtual ? clienteAtual.uid : null,
       criadoEm: Timestamp.now()
     };
     await setDoc(refAgendamento, dadosAgendamento);
@@ -631,6 +850,11 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
       horaInicio: dadosAgendamento.horaInicio,
       horaFim: dadosAgendamento.horaFim
     });
+
+    // Atualiza o endereço/telefone salvos na conta, pra pré-preencher da próxima vez
+    try{
+      await setDoc(doc(db,"clientes",clienteAtual.uid), {nome, telefone, endereco}, {merge:true});
+    }catch(errConta){ console.error("Não foi possível atualizar os dados salvos da conta:", errConta); }
 
     // Dispara e-mail de alerta pro barbeiro (via EmailJS) — falha no e-mail não deve
     // impedir a confirmação, já que o agendamento já foi salvo no banco.
@@ -645,6 +869,7 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
     document.getElementById("sucessoHorario").textContent = `${toHHMM(slotSelecionado.inicio)} - ${toHHMM(slotSelecionado.fim)}`;
     document.getElementById("areaAgendamento").classList.add("oculto");
     document.getElementById("msgSucesso").classList.remove("oculto");
+    document.getElementById("linkMeusAgendamentosSucesso").classList.toggle("oculto", !clienteAtual);
   }catch(err){
     console.error(err);
     alert("Não foi possível confirmar o agendamento. Tente novamente.");
@@ -655,6 +880,12 @@ document.getElementById("btnConfirmar").addEventListener("click", async () => {
 
 document.getElementById("btnNovoAgendamento").addEventListener("click", () => {
   window.location.reload();
+});
+document.getElementById("linkVerMeusAgendamentos").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("msgSucesso").classList.add("oculto");
+  document.getElementById("areaMinhaConta").classList.remove("oculto");
+  carregarMeusAgendamentos();
 });
 
 async function enviarAlertaEmail(nome, telefone, endereco, comentario){

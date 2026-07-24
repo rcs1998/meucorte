@@ -45,22 +45,22 @@
     padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px;
   }
 
-  #telaLogin{
+  #telaLogin, #telaCadastroBarbeiro{
     max-width:340px; margin: 70px auto; padding:24px;
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     text-align:center;
   }
-  #telaLogin img.logo{ width:90px; height:90px; margin: 0 auto 8px; display:block; }
-  #telaLogin h2{ font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); margin-top:0; }
-  #telaLogin input{
+  #telaLogin img.logo, #telaCadastroBarbeiro img.logo{ width:90px; height:90px; margin: 0 auto 8px; display:block; }
+  #telaLogin h2, #telaCadastroBarbeiro h2{ font-family:'Bebas Neue'; letter-spacing:1px; color:var(--brass); margin-top:0; }
+  #telaLogin input, #telaCadastroBarbeiro input{
     width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
     padding:11px; border-radius:8px; margin-bottom:10px; font-family:'Inter'; text-align:left;
   }
-  #telaLogin button{
+  #telaLogin button, #telaCadastroBarbeiro button{
     width:100%; background:var(--brass); color:#1b1510; border:none; padding:12px;
     border-radius:8px; font-family:'Bebas Neue'; letter-spacing:1px; font-size:16px; cursor:pointer;
   }
-  #erroLogin{ color:var(--blocked); font-size:12px; min-height:16px; }
+  #erroLogin, #erroCadastroBarbeiro{ color:var(--blocked); font-size:12px; min-height:16px; }
 
   header img.logo{ width:38px; height:38px; }
   header .titulo-header{ display:flex; align-items:center; gap:10px; }
@@ -152,6 +152,25 @@
   <input type="password" id="loginSenha" placeholder="••••••••">
   <button onclick="fazerLogin()">Entrar</button>
   <p id="erroLogin"></p>
+  <p style="font-size:13px; margin-top:10px; text-align:center;">
+    <a href="#" id="linkAbrirCadastroBarbeiro">Fui convidado(a) pelo dono — criar minha conta</a>
+  </p>
+</div>
+
+<div class="oculto" id="telaCadastroBarbeiro">
+  <img src="logo-meucorte.png" alt="Meu Corte" class="logo">
+  <h2>Criar conta de barbeiro</h2>
+  <label>E-mail (o mesmo que o dono cadastrou na Equipe)</label>
+  <input type="email" id="cadBarbeiroEmail" placeholder="seu@email.com">
+  <label>Nome</label>
+  <input type="text" id="cadBarbeiroNome" placeholder="Seu nome">
+  <label>Senha</label>
+  <input type="password" id="cadBarbeiroSenha" placeholder="Mínimo 6 caracteres">
+  <button onclick="criarContaBarbeiro()">Criar conta</button>
+  <p id="erroCadastroBarbeiro"></p>
+  <p style="font-size:13px; margin-top:10px; text-align:center;">
+    <a href="#" id="linkVoltarLoginBarbeiro">Voltar pro login</a>
+  </p>
 </div>
 
 <div id="app" class="oculto">
@@ -171,6 +190,7 @@
     <button data-aba="servicos">Serviços</button>
     <button data-aba="escala">Escala</button>
     <button data-aba="bloqueios">Bloqueios manuais</button>
+    <button data-aba="equipe" class="oculto" id="navEquipe">Equipe</button>
   </nav>
 
   <main>
@@ -368,6 +388,23 @@
       </div>
     </section>
 
+    <!-- EQUIPE (só o dono vê) -->
+    <section class="aba" id="aba-equipe">
+      <div class="card">
+        <h3>Adicionar barbeiro</h3>
+        <p style="color:var(--text-dim); font-size:13px;">Depois de adicionar, avise a pessoa pra abrir esse painel, clicar em "Fui convidado(a) pelo dono" e criar a própria senha usando esse mesmo e-mail.</p>
+        <div class="linha">
+          <div><label>Nome</label><input type="text" id="equipeNome" placeholder="Nome do barbeiro"></div>
+          <div><label>E-mail</label><input type="email" id="equipeEmail" placeholder="email@exemplo.com"></div>
+        </div>
+        <button class="acao" onclick="adicionarBarbeiro()">Adicionar</button>
+      </div>
+      <div class="card">
+        <h3>Equipe cadastrada</h3>
+        <div class="lista-cards" id="listaEquipe"></div>
+      </div>
+    </section>
+
     <!-- CLIENTES -->
     <section class="aba" id="aba-clientes">
       <div class="card">
@@ -427,7 +464,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, getDocs, addDoc, deleteDoc, doc, setDoc, getDoc, updateDoc,
@@ -456,9 +493,10 @@ const CICLO_ABCD28 = [["16:45","24:00"],null,["00:00","08:15"],["00:00","08:15"]
 const ANCORA_CICLO_ABCD28 = "2026-01-01";
 const OFFSET_LETRA_ABCD28 = {A:0, B:7, C:14, D:21};
 
+const EMAIL_MASTER = "rodrigocardoso03@outlook.com";
 let servicosCache = [];
 let atendimentoEmConclusao = null; // {id, servicosMarcados: Set}
-
+let ehUsuarioMaster = false;
 
 // ---------- Login ----------
 window.fazerLogin = async function(){
@@ -473,16 +511,132 @@ window.fazerLogin = async function(){
 };
 window.fazerLogout = function(){ signOut(auth); };
 
-onAuthStateChanged(auth, (user) => {
+document.getElementById("linkAbrirCadastroBarbeiro").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("telaLogin").classList.add("oculto");
+  document.getElementById("telaCadastroBarbeiro").classList.remove("oculto");
+});
+document.getElementById("linkVoltarLoginBarbeiro").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("telaCadastroBarbeiro").classList.add("oculto");
+  document.getElementById("telaLogin").classList.remove("oculto");
+});
+
+window.criarContaBarbeiro = async function(){
+  const email = document.getElementById("cadBarbeiroEmail").value.trim().toLowerCase();
+  const nome = document.getElementById("cadBarbeiroNome").value.trim();
+  const senha = document.getElementById("cadBarbeiroSenha").value;
+  const erroEl = document.getElementById("erroCadastroBarbeiro");
+  erroEl.textContent = "";
+
+  if(!email || !nome || !senha){ erroEl.textContent = "Preencha todos os campos."; return; }
+  if(senha.length < 6){ erroEl.textContent = "A senha precisa ter pelo menos 6 caracteres."; return; }
+
+  try{
+    const convite = await getDoc(doc(db,"barbeiros",email));
+    if(!convite.exists() || convite.data().ativo === false){
+      erroEl.textContent = "Esse e-mail ainda não foi autorizado pelo dono. Peça pra ele te adicionar na aba Equipe primeiro.";
+      return;
+    }
+    await createUserWithEmailAndPassword(auth, email, senha);
+    await setDoc(doc(db,"barbeiros",email), {...convite.data(), nome, contaCriada:true}, {merge:true});
+  }catch(err){
+    const mapa = {
+      "auth/email-already-in-use": "Esse e-mail já tem senha cadastrada — tente entrar em vez de criar conta.",
+      "auth/weak-password": "Senha muito fraca (mínimo 6 caracteres).",
+      "auth/invalid-email": "E-mail inválido."
+    };
+    erroEl.textContent = mapa[err.code] || "Não foi possível criar a conta. Tente novamente.";
+  }
+};
+
+onAuthStateChanged(auth, async (user) => {
   if(user){
+    ehUsuarioMaster = user.email === EMAIL_MASTER;
+    let autorizado = ehUsuarioMaster;
+
+    if(!ehUsuarioMaster){
+      try{
+        const snap = await getDoc(doc(db,"barbeiros", user.email));
+        autorizado = snap.exists() && snap.data().ativo !== false;
+      }catch(e){ console.error("Erro ao verificar autorização de equipe:", e); autorizado = false; }
+    }
+
+    if(!autorizado){
+      alert("Sua conta não tem acesso a este painel. Peça pro dono te autorizar na aba Equipe.");
+      await signOut(auth);
+      return;
+    }
+
     document.getElementById("telaLogin").classList.add("oculto");
+    document.getElementById("telaCadastroBarbeiro").classList.add("oculto");
     document.getElementById("app").classList.remove("oculto");
+    document.getElementById("navEquipe").classList.toggle("oculto", !ehUsuarioMaster);
     iniciarPainel();
   } else {
+    ehUsuarioMaster = false;
     document.getElementById("telaLogin").classList.remove("oculto");
+    document.getElementById("telaCadastroBarbeiro").classList.add("oculto");
     document.getElementById("app").classList.add("oculto");
   }
 });
+
+// ---------- Equipe (só o dono gerencia) ----------
+window.adicionarBarbeiro = async function(){
+  const nome = document.getElementById("equipeNome").value.trim();
+  const email = document.getElementById("equipeEmail").value.trim().toLowerCase();
+  if(!nome || !email){ alert("Preencha nome e e-mail."); return; }
+  await setDoc(doc(db,"barbeiros",email), {nome, ativo:true, contaCriada:false, criadoEm: Timestamp.now()});
+  document.getElementById("equipeNome").value = "";
+  document.getElementById("equipeEmail").value = "";
+  carregarEquipe();
+};
+
+window.alternarStatusBarbeiro = async function(email, ativar){
+  await setDoc(doc(db,"barbeiros",email), {ativo: ativar}, {merge:true});
+  carregarEquipe();
+};
+
+window.removerBarbeiro = async function(email){
+  if(!confirm(`Remover o acesso de ${email}? A pessoa não vai mais conseguir entrar no painel.`)) return;
+  await deleteDoc(doc(db,"barbeiros",email));
+  carregarEquipe();
+};
+
+async function carregarEquipe(){
+  if(!ehUsuarioMaster) return;
+  const snap = await getDocs(collection(db,"barbeiros"));
+  const lista = document.getElementById("listaEquipe");
+  const itens = [];
+  snap.forEach(d => itens.push({email:d.id, ...d.data()}));
+
+  if(!itens.length){
+    lista.innerHTML = `<p class="vazio">Nenhum barbeiro adicionado além de você.</p>`;
+    return;
+  }
+
+  lista.innerHTML = "";
+  itens.forEach(b => {
+    const ativo = b.ativo !== false;
+    const div = document.createElement("div");
+    div.className = "item-card";
+    div.innerHTML = `
+      <div class="linha-topo">
+        <strong>${b.nome}</strong>
+        ${ativo ? `<span class="badge particular">ativo</span>` : `<span class="badge escala">inativo</span>`}
+      </div>
+      <div class="info">
+        <div class="dim">${b.email}</div>
+        <div class="dim">${b.contaCriada ? "Já criou a senha" : "Ainda não criou a conta"}</div>
+      </div>
+      <div class="acoes-card">
+        <button class="secundario" onclick="alternarStatusBarbeiro('${b.email}', ${!ativo})">${ativo ? "Desativar" : "Reativar"}</button>
+        <button class="secundario" onclick="removerBarbeiro('${b.email}')">Remover</button>
+      </div>
+    `;
+    lista.appendChild(div);
+  });
+}
 
 // ---------- Navegação entre abas ----------
 document.querySelectorAll("nav.tabs button").forEach(btn => {
@@ -521,6 +675,7 @@ function iniciarPainel(){
     carregarDashboard();
     carregarDiasSemana();
     carregarEscalaPattern();
+    if(ehUsuarioMaster) carregarEquipe();
 
     document.getElementById("filtroData").addEventListener("change", carregarAgendamentos);
   }catch(err){
